@@ -95,5 +95,42 @@ namespace TestHelper
         {
             return text.EnumerateByLength(length).ToArray();
         }
+
+        /// <summary>
+        /// Decodes an encoded hex byte array to a string
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static string ByteArrayCodedHextoString(byte[] data)
+        {
+            StringBuilder result = new StringBuilder(data.Length);
+
+            foreach (byte value in data)
+            {
+                // 0-1 : 0x30-0x39
+                // a-f : 0x61-0x66
+                // A-F : 0x41-0x46
+                result.Append((char)Convert.ToInt32(value));
+            }
+
+            return result.ToString();
+        }
+
+        /// <summary>
+        /// Convert byte array [0x15, 0xFF...] to String "15FF..."
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static string ArrayToHexString(byte[] data)
+        {
+            var sb = new StringBuilder();
+
+            for (int i = 0; i < data.Length; ++i)
+            { 
+                sb.Append(data[i].ToString("x2"));
+            }
+            
+            return sb.ToString();
+        }
     }
 }
