@@ -9,8 +9,8 @@
             "program": "TC_transtest_all_autoselect_EMV.py",
             "console": "integratedTerminal",
             "args": [
-                "--serial", "COM11",
-                "--amount", "3250",
+                "--serial", "COM9",
+                "--amount", "000009999999",
                 "--amtother", "0000",
                 "--validateAmount", "n",
 
@@ -25,22 +25,22 @@
                 //,"--password", "test1234"
 
                 // fiserv ATTENDED
-                "--custid", "1111525",
-                "--password", "test1234",
+                //"--custid", "1111525",
+                //"--password", "test1234",
 
                 // fiserv UNATTENDED
-                //,"--custid",   "1111503"
-                //,"--password", "test1234"
-                
+                "--custid",   "1111503",
+                "--password", "test1234",
+
                 // Transaction Types
                 "--action", "sale",
-                //"--action", "verify",
                 //,"--online", "y"
                 "--pinattempts", "2",
                 "--partialauth", "y",
-                
+
                 // additional tags for ICC CERT: UNATTENDED (UX301) ONLY
-                "--device_pinpad_capable", "y"
+                "--device_pinpad_capable", "y",
+                "--transaction_menu", "y"
             ]
         }
     ]

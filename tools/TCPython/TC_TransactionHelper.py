@@ -26,6 +26,8 @@ import traceback
 import os.path
 from os import path
 
+# pip install pyperclip
+import pyperclip
 
 # ---------------------------------------------------------------------------- #
 # GLOBALS
@@ -138,19 +140,52 @@ def vspIsEncrypted(tlv, log):
 
 
 def displayEncryptedTrack(tlv, log):
-  sRED = tlv.getTag((0xFF, 0x7F), TLVParser.CONVERT_HEX_STR)[0].upper()
-  if len(sRED):
-    log.log("SRED DATA: " + sRED)
-    encryptedTrackIndex = sRED.find('DFDF10')
-    if encryptedTrackIndex != -1:
-      log.log("IDX=" + sRED[encryptedTrackIndex+6:encryptedTrackIndex+8])
-      temp = sRED[encryptedTrackIndex+6:encryptedTrackIndex+8]
-      log.log("LENGTH=" + temp)
-      dataLen = int(sRED[encryptedTrackIndex+6:encryptedTrackIndex+8], 16) * 2
-      encryptedData = sRED[encryptedTrackIndex+8:encryptedTrackIndex+8+dataLen]
-      if len(encryptedData):
-        log.logerr("ENCRYPTED TRACK LENGTH=" + str(dataLen))
-        log.log(encryptedData)
+    if tlv.tagCount((0xFF, 0x7F)):
+        sRED = tlv.getTag((0xFF, 0x7F), TLVParser.CONVERT_HEX_STR)[0].upper()
+        if len(sRED):
+            #log.log("SRED DATA: " + sRED)
+            
+            ksn  = ''
+            iv   = ''
+            vipa = ''
+            
+            # TAG DFDF11
+            ksnIndex = sRED.find('DFDF11')
+            if ksnIndex != -1:
+                dataLen = int(sRED[ksnIndex+6:ksnIndex+8], 16) * 2
+                ksn = sRED[ksnIndex+8:ksnIndex+8+dataLen]
+                if len(ksn):
+                    log.log('KSN : ' + ksn)
+    
+            # TAG DFDF12
+            ivIndex = sRED.find('DFDF12')
+            if ivIndex != -1:
+                dataLen = int(sRED[ivIndex+6:ivIndex+8], 16) * 2
+                iv = sRED[ivIndex+8:ivIndex+8+dataLen]
+                if len(iv):
+                    log.log('IV  : ' + iv)
+            
+            encryptedTrackIndex = sRED.find('DFDF10')
+            if encryptedTrackIndex != -1:
+                #log.log("IDX=" + sRED[encryptedTrackIndex+6:encryptedTrackIndex+8])
+                temp = sRED[encryptedTrackIndex+6:encryptedTrackIndex+8]
+                #log.log("LENGTH=" + temp)
+                dataLen = int(sRED[encryptedTrackIndex+6:encryptedTrackIndex+8], 16) * 2
+                encryptedData = sRED[encryptedTrackIndex+8:encryptedTrackIndex+8+dataLen]
+                if len(encryptedData):
+                    vipa = encryptedData
+                    log.logwarning("VIPA: [" + str(dataLen) + " CHARS IN LENGTH]")
+                    #log.log(encryptedData)
+                    
+                    # TVP|ksn:|iv:|vipa:|
+                    if len(ksn) and len(iv) and len(vipa):
+                        tclinkStr = 'TVP|ksn:' + ksn + '|iv:' + iv + '|vipa:' + vipa 
+                        log.logerr(tclinkStr)
+                        pyperclip.copy(tclinkStr)
+                            
+                    return True
+    return False
+
 
 # Decrypts VSP - encrypted data
 def vspDecrypt(tlv, tid, log):
@@ -248,7 +283,7 @@ def getCVMResult(tlv):
     encrypted_pin = (cvm_result[0] & 0x0f)
     # Indicate CVM type
     switcher = {
-        1: "PLAIN PIN",
+        1: "PLAIN PIN BY ICC",
         2: "ONLINE PIN",
         4: "ENCRYPTED BY ICC",
         14: "SIGNATURE",

@@ -12,7 +12,6 @@ from functools import partial
 from TC_testharness.tlvparser import TLVParser, tagStorage
 from TC_testharness.tlvparser import TLVPrepare
 from sys import exit
-from testharness.syslog import getSyslog
 from TC_testharness.syslog import getSyslog
 from TC_testharness.utility import getch, kbhit
 from testharness.utility import lrccalc
@@ -29,19 +28,167 @@ import os.path
 from os import path
 import re
 
-# ---------------------------------------------------------------------------- #
+# ----------------------------------------------------------------------------------------------------------- #
 # VERSION INFORMATION
 #
 # 20201208
 # 1. Contactless multi-application selection: requires second tap
 # 2. ONLINE PIN missing in transaction
-# 3. BALANCE INQUIRY - set "--action", "verify" in launch.json
+# 3. BALANCE INQUIRY - set "--action", "verify" and "--amount", "0000" in launch.json
 #VERSION_LBL = '1.0.0.0'
+#
 # 20201210
 # 1. Paypass Purchase with cashback transaction
 #    Changes to config files and TestHarness
-VERSION_LBL = '1.0.0.1'
+#VERSION_LBL = '1.0.0.1'
 #
+# 20201211
+# 1. ONLINE PIN PAYLOAD
+# 2. CASHBACK PARAMETERIZED OPTION
+#    Changes to device config files and TestHarness
+#VERSION_LBL = '1.0.0.2'
+#
+# 20201211
+# 1. Added ACTION type validation at transaction start
+# 2. Changes to device config files for MasterCard Paypass
+# 3. Added partial_auth=y to MSR workflows
+# 4. Fixed AMEX QC 039 Online PIN Retry workflow
+#VERSION_LBL = '1.0.0.3'
+#
+# 20201217
+# 1. Removed empty pin value in transaction request
+# 2. Changes to device config files for MasterCard TAG 9F33
+# 3. Missing TAGS for M-TIP MasterCard scenarios
+# 4. M-TIP05-USM Test 08 Scenario 01f - TAG 9F02 with cashback value
+#VERSION_LBL = '1.0.0.4'
+#
+# 20201218
+# 1. Added Transaction Menu
+# 2. Automated SALE+CASHBACK transaction
+# 3. COM02 Test 02 Scenario 03 - TAG 9F6E missing in transaction
+#VERSION_LBL = '1.0.0.5'
+#
+# 20201221
+# 1. Added Transaction Menu bypass
+# 2. VISA ADVT configuration
+#VERSION_LBL = '1.0.0.6'
+#
+# 20201221
+# 1. UnionPay configuration
+# 2. Fixed ONLINE PIN transaction for Discover
+#VERSION_LBL = '1.0.0.7'
+#
+# 20201221
+# 1. Enabled contactless balance inquiry
+# 2. Paypass USM19 Test 01 Scenario 01 TAG 9F1D like '48'
+#VERSION_LBL = '1.0.0.8'
+#
+# 20201223
+# 1. Corrected AAC and TC tag sequence
+# 2. Paypass USM01 Test 16 Scenario 01 - CVM=PIN
+# 3. DNA TC-28 - requires mapp.cfg update
+#VERSION_LBL = '1.0.0.9'
+#
+# 20201228
+# 1. Remove AAC tag modification code
+# 2. Update unattended config icckeys.key and contlemv.cfg
+# 3. Fix logging for utility method
+#VERSION_LBL = '1.0.0.10'
+#
+# 20210105
+# 1. Fix AMEX QC OFFLINE PIN verify workflows
+#VERSION_LBL = '1.0.0.11'
+#
+# 20210111
+# 1. M-TIP10 Test 01 Scenario 01f – Offline decline : Analyst wants receipt to be provided for the test case
+# 2. Unattended AXP QXC-04 'PLAIN PIN' message
+# 3. Added missing TAG 9F66 to Core request
+#VERSION_LBL = '1.0.0.12'
+#
+# 20210112
+# 1. Refund processing support
+# 2. Reverted offline decline scenario to not send transaction to Core
+#VERSION_LBL = '1.0.0.13'
+#
+# 20210113
+# 1. Removed EMV TAGS from Contactless MSD Transaction: AXP QC 019
+#VERSION_LBL = '1.0.0.14'
+# 20210114
+# 1. UX301 MSR HANDLING ENHANCEMENT
+# 2. AXP EP020:AXP EP020[a]|AXP EP020[b] handling
+#VERSION_LBL = '1.0.0.15'
+#
+# 20210115
+# 1. E2E CL 17 requires transaction to go ONLINE
+# 2. INTERLINK PROCESING AS CREDIT INSTEAD OF DEBIT
+#VERSION_LBL = '1.0.0.16'
+#
+# 20210119
+# 1. E2E_49 US QC PIN BYPASS MISSING
+#VERSION_LBL = '1.0.0.17'
+#
+# 20210120
+# 1. ADVT US Credit/Debit Multi-Application 2A.1 AID should be A000000003101001
+# 2. Added message to indicate PIN ENTRY BYPASS
+#VERSION_LBL = '1.0.0.18'
+#
+# 20210121
+# 1. AXP QC 033 - displays 'decline' after APPROVED
+# 2. AXP EP 06 Contactless Transaction Limit set to $15.00 
+# 3. MSI 94 TEST 03 SCENARIO 01 - 'DECLINED: OFFLINE'
+# 4. MSR Fallback failing
+#VERSION_LBL = '1.0.0.19'
+#
+# 20210125
+# 1. MCD19 Test 01 Scenario 01 TAG 9F1D
+#VERSION_LBL = '1.0.0.20'
+#
+# 20210128
+# 1. M-TIP10 Test 01 Scenario 01f – Offline decline: CORE to prevent transaction from going to processor
+# 2. 9F66 TAG requires Byte 1 Bit 8 set to 0 to disable MSD
+# 3. AXP EP019 - removed 'Not Authorised' message
+# 4. MCD19, MCD94 - removed 'Not Authorised' message
+# 5. pip install pyperclip
+# 6. MSR Credit/Debit Menu Selection (Debit PIN Entry)
+#VERSION_LBL = '1.0.0.21'
+#
+# 20210129
+# 1. MSR refunds for both Credit and Debit transactions
+#VERSION_LBL = '1.0.0.22'
+#
+# 20210203
+# 1. MCD01 Test 01 Scenario 02: Blind Refund as a mock
+# 2. MSR Debit Refunds: Blind Refund as a mock
+#VERSION_LBL = '1.0.0.23'
+#
+# 20210205
+# 1. Paypass USM50 Test 01 Scenario 01
+# * Returns CARD NOT supported error and doesn’t have receipt
+# * fixed configuration issue: MAESTRO TAG DF811B=90
+# 3. Paypass COM01 Test 01 Scenario 02
+# * Returns CARD NOT supported error and doesn’t have receipt
+# * Transaction amount: 10001, MAESTRO TAG DF8118=40
+# 4. USM94.02.01 requires TAC_Denial = 00 00 00 00 00
+# * TAC Denial/Online settings reversed
+VERSION_LBL = '1.0.0.24'
+#
+# ----------------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------- #
+# REGRESSION TESTS TO RUN
+### AMEX
+#  1. SALE           : Amex AXP QC 004 OFFLINE PIN
+#  2. SALE           : Amex AXP QC 008 PIN BYPASS
+#  3. SALE           : Amex AXP QC 032 ONLINE PIN
+### M/C
+#  4. SALE + CASHBACK: Mastercard M-TIP05-USM Test 08 Scenario 01f
+#  5. BALANCE INQUIRY: Mastercard M-TIP06 Test 10 Scenario 01
+#  6. SALE + CASHBACK: Mastercard PayPass MSI01 Test 09 Scenario 01
+#  7. SALE           : Mastercard Paypass USM01 Test 16 Scenario 01
+#  8. SALE           : Mastercard Paypass USM12 Test 01 Scenario 02
+### VISA
+#  9. SALE           : VISA ADVT 7.0aqc Test Case 1a
+# 10. SALE           : VISA CDET Debit 1C.2
 # ---------------------------------------------------------------------------- #
 
 # ---------------------------------------------------------------------------- #
@@ -59,9 +206,23 @@ VERSION_LBL = '1.0.0.1'
 
 TRANSACTION_TYPE = b'\x00'  # SALE TRANSACTION
 #TRANSACTION_TYPE = b'\x09'  # SALE WITH CASHBACK TRANSACTION - MTIP05-USM Test 08 Scenario 01f
-# BALANCE INQUIRY - MTIP06_10_01_15A, MTIP06_12_01_15A
+#TRANSACTION_TYPE = b'\x30'  # BALANCE INQUIRY 
+#BALANCE INQUIRY - MTIP06_10_01_15A, MTIP06_12_01_15A
+ISBLINDREFUND = False
 ISBALANCEINQUIRY = TRANSACTION_TYPE == b'\x30'
 AMOUNTFORINQUIRY = b'\x00\x00\x00\x00\x00\x00'
+
+# Transaction Type Dictionary
+TransactionType = {
+    1: [ b'\x00', "SALE / PURCHASE" ],
+    2: [ b'\x01', "CASH ADVANCE" ],
+    3: [ b'\x09', "SALE WITH CASHBACK" ],
+    4: [ b'\x20', "RETURN / REFUND" ],
+    5: [ b'\x30', "BALANCE INQUIRY" ],
+    6: [ b'\x31', "RESERVATION" ],
+    7: [ b'\x20', "* BLIND REFUND MOCK *" ]
+}
+TransactionTitle = 'SELECT TYPE:'
 
 # UX == UNATTENDED
 DEVICE_UNATTENDED = ""
@@ -69,7 +230,8 @@ DEVICE_UNATTENDED = ""
 EMV_CARD_REMOVED = 0
 EMV_CARD_INSERTED = 1
 MAGSTRIPE_TRACKS_AVAILABLE = 2
-ERROR_UNKNOWN_CARD = 3
+MAGSTRIPE_CARD_SWIPE = 3
+ERROR_UNKNOWN_CARD = 4
 
 QUICKCHIP_ENABLED = [(0xDF, 0xCC, 0x79), [0x01]]
 ISSUER_AUTH_DATA = [(0x91), [0x37, 0xDD, 0x29, 0x75, 0xC2, 0xB6, 0x68, 0x2D, 0x00, 0x12]]
@@ -83,10 +245,11 @@ ACQUIRER_ID = [(0xC2), [0x36, 0x35]]
 #   2. ONLINE ACTION REQUIRED TEMPLATE 0xE4 MUST HAVE args.online == "y"
 ###
 
-# AUTHRESPONSECODE = [ (0x8A), [0x30, 0x30] ]  # authorization response code of 00
-# AUTHRESPONSECODE = [ (0x8A), [0x59, 0x31] ]  # authorization response code of Y1
-# AUTHRESPONSECODE = [ (0x8A), [0x59, 0x32] ]  # authorization response code of Y2
-AUTHRESPONSECODE = [(0x8A), [0x5A, 0x33]]      # authorization response code of Z3 (unable to contact host)
+#AUTHRESPONSECODE = [ (0x8A), [0x30, 0x30] ]  # authorization response code of 00
+#AUTHRESPONSECODE = [ (0x8A), [0x59, 0x31] ]  # authorization response code of Y1 - offline approved
+#AUTHRESPONSECODE = [ (0x8A), [0x59, 0x33] ]  # authorization response code of Y3 - unable to go online, offline approved
+#AUTHRESPONSECODE = [ (0x8A), [0x5A, 0x31] ]  # authorization response code of Z1 - offline declined
+AUTHRESPONSECODE = [ (0x8A), [0x5A, 0x33] ]  # authorization response code of Z3 - unable to go online, offline decline
 
 # CURRENCY / COUNTRY CODE
 UK = b'\x08\x26'
@@ -99,9 +262,9 @@ COUNTRY_CODE = [(0x9F, 0x1A), US]
 # is contacted, the decision is made with tag C0. If the acquirer cannot be contacted or a stand-in authorisation
 # is detected, do not send this tag. By not sending the tag, default analysis is carried out.
 #
-# ‘C0’ must be sent in the next ‘Continue Transaction’ command, set as positive to request a TC or negative to request an AAC.
-CONTINUE_REQUEST_TC  = [(0xC0), [0x00]]  # Offline (Z3)
-CONTINUE_REQUEST_AAC = [(0xC0), [0x01]]  # Online (00)
+# ‘C0’ must be sent in the next ‘Continue Transaction’ command, set as positive (0x01) to request a TC or negative (0x00) to request an AAC.
+CONTINUE_REQUEST_AAC  = [(0xC0), [0x00]]  # Online (00)
+CONTINUE_REQUEST_TC   = [(0xC0), [0x01]]  # Offline (Z3)
 
 ONLINE = 'n'
 ISOFFLINE = AUTHRESPONSECODE[1] == [0x5A, 0x33]
@@ -114,24 +277,42 @@ TIME = b'\x00\x00\x00'
 
 APPLICATION_LABEL = ''
 
+# ---------------------------------------------------------------------------- #
+# ONLINE PIN VSS
+# Alter from default of 2 to VSS Script index 2 (host_id=3)
+HOST_ID = 0x02  
+# Key Set Id - VSS SLOT (0 - PROD, 8 - DEV)
+KEYSET_ID = 0x00
+    
+# ---------------------------------------------------------------------------- #
+# ONLINE PIN IPP DUPK
+#HOST_ID = 0x05
+# IPP KEY SLOT
+#KEYSET_ID = 0x01
+
 # ONLINE PIN LENGTHS
 PINLEN_MIN = 0x04
 PINLEN_MAX = 0x06
 
 OnlineEncryptedPIN = ""
 OnlinePinKSN = ""
+
 OnlinePinContinueTPL = []
 OFFLINERESPONSE = ""
 
 # DISPLAY MESSAGES
-DM_9F25 = "BAD CARD-TRANSACTION ABORTED"
+DM_9F0D = "INTERNAL ERROR\n\t-\n\tTAG DFDF30"
+DM_9F22 = "DEVICE NOT READY\n\tFOR COMMAND"
+DM_9F25 = "BAD CARD-\n\tTRANSACTION ABORTED"
 DM_9F28 = "CARD NOT SUPPORTED"
-DM_9F31 = "PLEASE PRESENT ONE CARD ONLY"
-DM_9F33 = "SEE PHONE FOR INSTRUCTIONS"
+DM_9F31 = "PLEASE PRESENT ONE\n\tCARD ONLY"
+DM_9F33 = "SEE PHONE FOR\n\tINSTRUCTIONS"
 DM_9F34 = "INSERT CARD"
-DM_9F35 = "ENTER CONSUMER DEVICE CVM"
-DM_9F41 = "USER CANCELLED PIN ENTRY"
-DM_9F42 = "CASHBACK NOT ALLOWED"
+DM_9F35 = "ENTER CONSUMER\n\tDEVICE CVM"
+DM_9F36 = "CONTACTLESS CARD LEFT\n\tIN FIELD - REMOVE"
+DM_9F41 = "USER CANCELLED\n\tPIN ENTRY"
+DM_9F42 = "CASHBACK NOT\n\tALLOWED"
+DM_9F43 = "USER CANCELLED"
 
 # PROCESSING
 EMV_VERIFICATION = 0
@@ -145,10 +326,42 @@ FALLBACK_TYPE = 'technical'
 LIST_STYLE_SCROLL = 0x00
 LIST_STYLE_NUMERIC = 0x01
 LIST_STYLE_SCROLL_CIRCULAR = 0x02
-
+    
+    
 # ---------------------------------------------------------------------------- #
 # UTILTIES
 # ---------------------------------------------------------------------------- #
+
+def selectTransaction():
+  ''' Set data for request '''
+  c_tag = tagStorage()
+  c_tag.store( (0xDF, 0xA2, 0x12), LIST_STYLE_SCROLL )
+  #BUG: Unable to push the direct string not bytearray
+  c_tag.store( (0xDF,0xA2,0x11), TransactionTitle )
+  
+  i = 1
+  for key in TransactionType:
+      c_tag.store( (0xDF, 0xA2, 0x02), i )
+      c_tag.store( (0xDF, 0xA2, 0x03), TransactionType[key][1] )
+      i = i + 1
+      
+  ''' Send request '''
+  conn.send([0xD2, 0x03, 0x00, 0x01] , c_tag.get())
+  status, buf, uns = getAnswer()
+  
+  # if user cancels, default to 'SALE' Transaction
+  if status == 0x9f43:
+      return 1
+  
+  index = 1     # default to SALE
+  tlv = TLVParser(buf)
+  if tlv.tagCount((0xDF, 0xA2, 0x02)) == 1:
+    selection = tlv.getTag((0xDF, 0xA2, 0x02))[0]
+    index = selection[0]
+
+  log.log("TRANSACTION TYPE: '" + TransactionType[index][1] + "' AT INDEX =", index)
+  return index
+
 
 def AbortTransaction():
     log.logerr('Abort Current Transaction')
@@ -219,7 +432,7 @@ def getAnswer(ignoreUnsolicited=True, stopOnErrors=True):
         #
         # track acceptable errors in EMV Certification Testing
         #
-        if status != 0x9000 and status != 0x9F36 and status != 0x9f22 and status != 0x9f25 and status != 0x9f28 and status != 0x9f31 and status != 0x9f33 and status != 0x9f34 and status != 0x9f35 and status != 0x9f41 and status != 0x9f42:
+        if status != 0x9000 and status != 0x9f0d and status != 0x9F36 and status != 0x9f22 and status != 0x9f25 and status != 0x9f28 and status != 0x9f31 and status != 0x9f33 and status != 0x9f34 and status != 0x9f35 and status != 0x9f41 and status != 0x9f42 and status != 0x9f43:
             log.logerr('Pinpad reported error ', hex(status))
             traceback.print_stack()
             if stopOnErrors:
@@ -236,6 +449,19 @@ def getEMVAnswer(ignoreUnsolicited=False):
 # ---------------------------------------------------------------------------- #
 # DEVICE CONNECTIVITY AND STATE
 # ---------------------------------------------------------------------------- #
+
+def startConnection():
+    # instantiate connection
+    req_unsolicited = conn.connect()
+    if req_unsolicited:
+        # Receive unsolicited
+        log.log('Waiting for unsolicited')
+        #status, buf, uns = getAnswer(False)
+        #log.log('Unsolicited', TLVParser(buf) )
+
+    # abort current transaction
+    AbortTransaction()
+
 
 def startMonitoringCardStatus():
     log.log('*** START CARD MONITORING ***')
@@ -266,6 +492,24 @@ def startMonitoringCardStatus():
     #
     # CARD STATUS [D0, 60]
     conn.send([0xD0, 0x60, P1, P2])
+
+
+def getCardStatus():
+    # P1
+    # Bit 0 - Sets the device to report changes in card status
+    # CARD STATUS [D0, 60]
+    conn.send([0xD0, 0x60, 0x01, 0x00])
+    status, buf, uns = getAnswer(False)
+    return TLVParser(buf)
+
+def getEMVCardStatus():
+    # P1
+    # Bit 0 - Sets the device to report changes in card status
+    # CARD STATUS [D0, 60]
+    conn.send([0xD0, 0x60, 0x01, 0x00])
+    status, buf, uns = getAnswer(False)
+    tlv = TLVParser(buf)
+    return EMVCardState(tlv)
 
 
 def stopMonitoringCardStatus():
@@ -322,7 +566,8 @@ def displayAidChoice(tlv):
         app_sel_tags.append([(0x9F, 0x06), appAIDs[i]])
 
     app_sel_templ = (0xE0, app_sel_tags)
-    log.log("CONTINUE TRANSACTION: AID CHOICE ---------------------------------------------------------------------")
+    
+    log.log("CONTINUE TRANSACTION: AID CHOICE --------------------------------------------")
     # CONTINUE TRANSACTION [DE D2]
     conn.send([0xDE, 0xD2, 0x00, 0x00], app_sel_templ)
     log.log('waiting for App Selection...')
@@ -373,7 +618,7 @@ def requestAIDChoice(tlv):
             ]
             app_sel_templ = (0xE0, app_sel_tags)
 			
-            log.log("CONTINUE TRANSACTION: AID CHOICE ---------------------------------------------------------------------")
+            log.log("CONTINUE TRANSACTION: AID CHOICE --------------------------------------------")
             # CONTINUE TRANSACTION [DE D2]
             conn.send([0xDE, 0xD2, 0x00, 0x00], app_sel_templ)
             log.log('App selected, waiting for response...')
@@ -428,7 +673,8 @@ def applicationSelection(tlv):
             ACQUIRER_ID
         ]
         app_sel_templ = (0xE0, app_sel_tags)
-        log.log("CONTINUE TRANSACTION: AID CHOICE ---------------------------------------------------------------------")
+        
+        log.log("CONTINUE TRANSACTION: AID CHOICE --------------------------------------------")
         # CONTINUE TRANSACTION [DE D2]
         conn.send([0xDE, 0xD2, 0x00, 0x00], app_sel_templ)
         log.log('App selected, waiting for response...')
@@ -477,15 +723,19 @@ def MagstripeCardState(tlv):
     # Check for card status
     if tlv.tagCount(0x48):
         ins_tag_val = tlv.getTag(0x48, TLVParser.CONVERT_INT)[0]
+        swipe_state = (ins_tag_val & 0xFF00) >> 8
         ins_tag_val &= 0x00FF
         if ins_tag_val == 1:
             log.logerr('Magstripe, but no tracks!')
             res = ERROR_UNKNOWN_CARD
         else:
-            if ins_tag_val == 0:
-                res = EMV_CARD_REMOVED
+            if swipe_state == 1:
+                res = MAGSTRIPE_CARD_SWIPE
             else:
-                res = MAGSTRIPE_TRACKS_AVAILABLE
+                if ins_tag_val == 0:
+                    res = EMV_CARD_REMOVED
+                else:
+                    res = MAGSTRIPE_TRACKS_AVAILABLE
     return res
 
 
@@ -508,7 +758,7 @@ def removeEMVCard():
                 break
         if len(tlv):
             log.logerr('Bad packet ', tlv)
-
+            
     return tlv
 
         
@@ -587,6 +837,46 @@ def requestChoice(message, length):
     return choice
 
 
+def selectCreditOrDebit():
+    
+    SelectionType = {
+        1: ["CREDIT"],
+        2: ["DEBIT"]
+    }
+    # Set data for request
+    c_tag = tagStorage()
+    c_tag.store( (0xDF, 0xA2, 0x12), LIST_STYLE_SCROLL )
+    #BUG: Unable to push the direct string not bytearray
+    c_tag.store( (0xDF,0xA2,0x11), "TRANSACTION TYPE" )
+
+    i = 1
+    for key in SelectionType:
+        c_tag.store( (0xDF, 0xA2, 0x02), i )
+        c_tag.store( (0xDF, 0xA2, 0x03), SelectionType[key][0] )
+        i = i + 1
+             
+    # Send request
+    conn.send([0xD2, 0x03, 0x00, 0x01] , c_tag.get())
+    # Wait for selection
+    status, buf, uns = getAnswer()
+
+    # default to SALE
+    choice = 1     
+  
+    # if user cancels, default to 'CREDIT' Transaction
+    if status == 0x9f43:
+        return choice
+    
+    if status == 0x9000:
+        tlv = TLVParser(buf)
+        if tlv.tagCount((0xDF, 0xA2, 0x02)) == 1:
+            selection = tlv.getTag((0xDF, 0xA2, 0x02))[0]
+            choice = selection[0]
+
+    log.logwarning("TRANSACTION TYPE:", SelectionType[choice][0])
+    return choice
+    
+
 # ---------------------------------------------------------------------------- #
 # PIN Workflow
 # ---------------------------------------------------------------------------- #
@@ -612,7 +902,8 @@ def verifyOfflinePIN(pinTryCounter):
 
 def getOnlinePin(tlv):
     global TRANSACTION_TYPE, AMOUNT, PINLEN_MIN, PINLEN_MAX
-
+    global HOST_ID, KEYSET_ID
+    
     onlinepin_tag = [
         [(0xDF, 0xDF, 0x17), AMOUNT],          # transaction amount
         [(0xDF, 0xDF, 0x24), b'PLN'],          # transaction currency
@@ -631,12 +922,9 @@ def getOnlinePin(tlv):
         [(0xDF, 0xEC, 0x7D), b'0x01']
     ]
     onlinepin_tpl = (0xE0, onlinepin_tag)
-
-    # Alter from default of 2 to VSS Script index 2 (host_id=3)
-    host_id = 0x02
-
+  
     # ONLINE PIN [DE, D6]
-    conn.send([0xDE, 0xD6, host_id, 0x00], onlinepin_tpl)
+    conn.send([0xDE, 0xD6, HOST_ID, KEYSET_ID], onlinepin_tpl)
     status, buf, uns = getEMVAnswer()
 
     if status == 0x9000:
@@ -649,6 +937,11 @@ def getOnlinePin(tlv):
             if len(encryptedPIN):
                 ksn = pin_tlv.getTag((0xDF, 0xED, 0x03), TLVParser.CONVERT_HEX_STR)[0].upper()
                 if len(ksn):
+                    # adjust KSN for IPP
+                    if HOST_ID == 0x05:
+                        encryptedPIN = bytes.fromhex(encryptedPIN).decode('utf-8') 
+                        ksnStr = bytes.fromhex(ksn).decode('utf-8')
+                        ksn = "{:F>20}".format(ksnStr)
                     displayMsg('Processing ...')
                     TC_TCLink.saveEMVData(tlv, 0xE4)
 
@@ -658,6 +951,8 @@ def performUserPINEntry():
     log.log('PIN Entry is being performed, waiting again')
     print('PIN Entry, press \'A\' to abort, \'B\' to bypass or \'C\' to cancel')
 
+    hasPinEntry = True
+    
     while True:
         #sleep(1)
         validKey = False
@@ -677,7 +972,7 @@ def performUserPINEntry():
                 # VERIFY PIN [DE D5]
                 conn.send([0xDE, 0xD5, 0xFF, 0x01])
                 validKey = True
-
+                
             if key == 'c' or key == 'C':
                 log.logerr('cancelling')
                 # VERIFY PIN [DE D5]
@@ -685,6 +980,7 @@ def performUserPINEntry():
                 validKey = True
 
             if validKey:
+                hasPinEntry = False
                 # Wait for confirmation, then break to wait for response
                 status, buf, uns = getAnswer(stopOnErrors=False)
                 if status == 0x9000:
@@ -696,29 +992,28 @@ def performUserPINEntry():
 
         if conn.is_data_avail():
             break
+        
+    return hasPinEntry
 
 
 def getPINEntry(tlv):
 
     global OnlineEncryptedPIN, OnlinePinKSN
+    global HOST_ID, KEYSET_ID
 
     log.log('PIN Entry is being performed, waiting again')
-    #PANDATA = b'\x54\x13\x33\x00\x89\x00\x00\x39'
-    #log.log("PAN: ", hexlify(PANDATA).decode('ascii'))
     onlinepin_tag = [
         [(0xDF, 0xDF, 0x17), AMOUNT],   # transaction amount
         [(0xDF, 0xDF, 0x24), b'PLN'],   # transaction currency
         [(0xDF, 0xDF, 0x1C), 0x02],     # transaction currency exponent
         [(0xDF, 0xA2, 0x0E), 0x0F],     # pin entry timeout: default 30 seconds
-        #[(0x5A), PANDATA]               # PAN DATA
     ]
-    #response = "declined"
-    #attempts = 0
-    # while response != "approved" and attempts < args.pinattempts:
     onlinepin_tpl = (0xE0, onlinepin_tag)
+    
     # ONLINE PIN [DE, D6]
-    conn.send([0xDE, 0xD6, 0x02, 0x00], onlinepin_tpl)
+    conn.send([0xDE, 0xD6, HOST_ID, KEYSET_ID], onlinepin_tpl)
     status, buf, uns = getEMVAnswer()
+    
     if status != 0x9000:
         return -1
     pin_tlv = TLVParser(buf)
@@ -726,25 +1021,28 @@ def getPINEntry(tlv):
 
     OnlineEncryptedPIN = pin_tlv.getTag((0xDF, 0xED, 0x6C))[0].hex().upper()
     OnlinePinKSN = pin_tlv.getTag((0xDF, 0xED, 0x03), TLVParser.CONVERT_HEX_STR)[0].upper()
-
+    # adjust KSN for IPP
+    if HOST_ID == 0x05:
+        OnlineEncryptedPIN = bytes.fromhex(OnlineEncryptedPIN).decode('utf-8') 
+        ksnStr = bytes.fromhex(OnlinePinKSN).decode('utf-8')
+        OnlinePinKSN = "{:F>20}".format(ksnStr)
+    if len(OnlineEncryptedPIN) and len(OnlinePinKSN):
+         log.logwarning("PIN=" + OnlineEncryptedPIN + "|" + OnlinePinKSN)
     return 1
 
 
-def OnlinePinTransaction(tlv, cardState, continue_tpl, need2ndGen=True, setattempts = 0):
+def OnlinePinTransaction(tlv, cardState, continue_tpl, setattempts = 0, bypassSecongGen = False):
     global TRANSACTION_TYPE, AMOUNT, PINLEN_MIN, PINLEN_MAX
-
+    global HOST_ID, KEYSET_ID
+    
     # AXP QC 032 REQUIRES 2nd GENERATE AC to report TAGS 8A and 9F27
-    if need2ndGen:
+    if cardState == EMV_CARD_INSERTED and bypassSecongGen == False:
         sendSecondGenAC(continue_tpl)
 
     log.log('Online PIN mode')
 
     # If SRED is enabled and pan_cache_timeout is specified in the [vipa] section of MAPP_VSD_SRED.CFG, the last cached PAN will be used for
     # PIN Block Formats that require PAN in case the PAN tag is not supplied.
-    #PANDATA = b'\x54\x13\x33\x00\x89\x00\x00\x39'
-    #PANDATA = tlv.getTag(0x5A)
-    #log.log("PAN: ", hexlify(PANDATA).decode('ascii'))
-
     onlinepin_tag = [
         [(0xDF, 0xDF, 0x17), AMOUNT],          # transaction amount
         [(0xDF, 0xDF, 0x24), b'PLN'],          # transaction currency
@@ -753,7 +1051,6 @@ def OnlinePinTransaction(tlv, cardState, continue_tpl, need2ndGen=True, setattem
         # pin entry timeout: default 30 seconds
         # min pin length
         # max pin length
-        # [(0x5A), PANDATA],                     # PAN DATA
         [(0xDF, 0xDF, 0x1C), 0x02], 
         [(0xDF, 0xDF, 0x1D), TRANSACTION_TYPE], 
         [(0xDF, 0xA2, 0x0E), 0x0F], 
@@ -768,13 +1065,17 @@ def OnlinePinTransaction(tlv, cardState, continue_tpl, need2ndGen=True, setattem
 
     response = "declined"
     attempts = setattempts
-    host_id = 0x02  # Alter from default of 2 to VSS Script index 2 (host_id=3)
-
+    
     while response != "approved" and attempts < args.pinattempts:
         # ONLINE PIN [DE, D6]
-        conn.send([0xDE, 0xD6, host_id, 0x00], onlinepin_tpl)
+        conn.send([0xDE, 0xD6, HOST_ID, KEYSET_ID], onlinepin_tpl)
         status, buf, uns = getEMVAnswer()
         if status != 0x9000:
+            pin_tlv = TLVParser(buf)
+            if pin_tlv.tagCount((0xDF, 0xDF, 0x30)):
+                response = pin_tlv.getTag((0xDF, 0xDF, 0x30), TLVParser.CONVERT_HEX_STR)[0].upper()
+                if len(response):
+                    log.logerr("PIN RETRIEVE RESPONSE=" + response)    
             break
         pin_tlv = TLVParser(buf)
 
@@ -785,8 +1086,15 @@ def OnlinePinTransaction(tlv, cardState, continue_tpl, need2ndGen=True, setattem
             if len(encryptedPIN):
                 ksn = pin_tlv.getTag((0xDF, 0xED, 0x03), TLVParser.CONVERT_HEX_STR)[0].upper()
                 if len(ksn):
+                    # adjust KSN for IPP
+                    if HOST_ID == 0x05:
+                        encryptedPIN = bytes.fromhex(encryptedPIN).decode('utf-8')
+                        ksnStr = bytes.fromhex(ksn).decode('utf-8')
+                        ksn = "{:F>20}".format(ksnStr) 
                     displayMsg('Processing ...')
                     TC_TCLink.saveEMVData(tlv, 0xE4)
+
+                    TC_TCLink.SetProperties(args, log)
 
                     # send to process online PIN entry
                     response = TC_TCLink.processPINTransaction(encryptedPIN, ksn)
@@ -795,12 +1103,10 @@ def OnlinePinTransaction(tlv, cardState, continue_tpl, need2ndGen=True, setattem
                         displayMsg('Invalid PIN', 3)
                         attempts += 1
 
-                    TC_TCLink.SetProperties(args, log)
-
                     if response != "approved" and attempts >= args.pinattempts:
                         displayMsg('PIN try limit exceeded', 3)
         else:
-            # force PIN bypass
+           # force PIN bypass
             status = 0x9f41
             break
 
@@ -808,7 +1114,8 @@ def OnlinePinTransaction(tlv, cardState, continue_tpl, need2ndGen=True, setattem
     nextstep = -1
     if status == 0x9f41:
         nextstep = 2
-        processPinBypass()
+        if (cardState == EMV_CARD_INSERTED):
+            processPinBypass()
 
     if (cardState == EMV_CARD_INSERTED):
         removeEMVCard()
@@ -830,14 +1137,14 @@ def OnlinePinTransaction(tlv, cardState, continue_tpl, need2ndGen=True, setattem
     return nextstep
 
 
-def OnlinePinInTemplateE6(tlv, cardState, continue_tpl):
-    global TRANSACTION_TYPE, AMOUNT, PINLEN_MIN, PINLEN_MAX
+def OnlinePinInTemplateE6():
+    
     global OnlineEncryptedPIN, OnlinePinKSN
+    global HOST_ID, KEYSET_ID
  
     # If SRED is enabled and pan_cache_timeout is specified in the [vipa] section
     # of MAPP_VSD_SRED.CFG, the last cached PAN will be used for PIN Block
     # Formats that require PAN in case the PAN tag is not supplied.
-    #PANDATA = b'\x54\x13\x33\x00\x89\x00\x00\x39'
 
     # DFED0D
     # Flags for the entry. The following bits are checked:
@@ -851,20 +1158,23 @@ def OnlinePinInTemplateE6(tlv, cardState, continue_tpl):
     # ONLINE_PIN_PART_OF_EMV_TRANS=1 must be set in cardapp.cfg
     #
     onlinepin_tag = [
-        #[(0x5A), PANDATA],
         [(0xDF, 0xED, 0x0D), retrieve_pinblock]
     ]
     onlinepin_tpl = (0xE0, onlinepin_tag)
-
-    # Alter from default of 2 to VSS Script index 2 (host_id=3)
-    host_id = 0x02
-
+ 
+    log.log('Online PIN: retrieving PINBLOCK ---------------------------------------------')
+    log.log('HOST_ID=' + str(HOST_ID) + ', KEY_SLOT=' + str(KEYSET_ID))
     # ONLINE PIN [DE, D6]
-    log.log('Online PIN: retrieving PINBLOCK ------------------------------------------------------------------------')
-    conn.send([0xDE, 0xD6, host_id, 0x00], onlinepin_tpl)
+    conn.send([0xDE, 0xD6, HOST_ID, KEYSET_ID], onlinepin_tpl)
     status, buf, uns = getEMVAnswer()
     if status != 0x9000:
+        pin_tlv = TLVParser(buf)
+        if pin_tlv.tagCount((0xDF, 0xDF, 0x30)):
+            response = pin_tlv.getTag((0xDF, 0xDF, 0x30), TLVParser.CONVERT_HEX_STR)[0].upper()
+            if len(response):
+                log.logerr("PIN RETRIEVE RESPONSE=" + response)    
         return -1
+    
     pin_tlv = TLVParser(buf)
 
     # obtain PIN Block: KSN and Encrypted data
@@ -875,9 +1185,12 @@ def OnlinePinInTemplateE6(tlv, cardState, continue_tpl):
             OnlineEncryptedPIN = encryptedPIN
             ksn = pin_tlv.getTag((0xDF, 0xED, 0x03), TLVParser.CONVERT_HEX_STR)[0].upper()
             if len(ksn):
+                # adjust KSN for IPP
+                if HOST_ID == 0x05:
+                    OnlineEncryptedPIN = bytes.fromhex(encryptedPIN).decode('utf-8')
+                    ksnStr = bytes.fromhex(ksn).decode('utf-8')
+                    ksn = "{:F>20}".format(ksnStr)
                 OnlinePinKSN = ksn
-                displayMsg('Processing ...')
-                TC_TCLink.saveEMVData(tlv, 0xE4)
                 
     # send transaction online
     return 6
@@ -896,7 +1209,7 @@ def processPinBypass():
     ]
     pinbypass_tpl = (0xE0, pinbypass_tag)
     
-    log.log("CONTINUE TRANSACTION: GenAC1 -----------------------------------------------------------------------------")
+    log.log("CONTINUE TRANSACTION: GenAC1 ------------------------------------------------")
     
     conn.send([0xDE, 0xD2, 0x00, 0x00], pinbypass_tpl)
     status, buf, uns = getAnswer(stopOnErrors=False)
@@ -928,7 +1241,7 @@ def processOnlinePIN(tlv, cardState, continue_tpl):
     # abort transaction
     AbortTransaction()
     # Online PIN
-    return OnlinePinTransaction(tlv, cardState, continue_tpl, False)
+    return OnlinePinTransaction(tlv, cardState, continue_tpl)
 
 # ---------------------------------------------------------------------------- #
 # MSR Workflow
@@ -967,19 +1280,16 @@ def setMSRTrack2DataAndExpiry(tlv, save = False):
 # ---------------------------------------------------------------------------- #
 
 def setFirstGenContinueTransaction():
+    
     continue_tran_tag = [
-        [(0x9F, 0x02), AMOUNT],         # Amount
-        [(0x9F, 0x03), AMTOTHER],       # Amount, other 
+        [ (0x9F, 0x02), AMOUNT ],           # Amount
+        [ (0x9F, 0x03), AMTOTHER ],         # Amount, other 
         CURRENCY_CODE, 
         COUNTRY_CODE, 
-        ACQUIRER_ID,                    # TAG C2 acquirer id: ref. iccdata.dat
-        [(0xDF, 0xA2, 0x18), [0x00]],   # Pin entry style
-        #[ (0xDF, 0xA2, 0x0E), [0x5A] ], # Pin entry timeout
-        [(0xDF, 0xA3, 0x07),            # Bit map display
-        #[ (0x89), [0x00] ],             # Host Authorisation Code)
-        AUTHRESPONSECODE,               # TAG 8A
-        CONTINUE_REQUEST_TC if ISOFFLINE else CONTINUE_REQUEST_AAC, # TAG C0 object decision: 00=AAC, 01=TC
-        [0x03, 0xE8]], 
+        ACQUIRER_ID,                        # TAG C2 acquirer id: ref. iccdata.dat
+        [ (0xDF, 0xA2, 0x18), [0x00] ],     # Pin entry style
+        AUTHRESPONSECODE,                   # TAG 8A
+        CONTINUE_REQUEST_AAC if (ISOFFLINE or ISBALANCEINQUIRY) else CONTINUE_REQUEST_TC, # TAG C0 object decision: AAC=00, TC=01
         QUICKCHIP_ENABLED
     ]
 
@@ -990,8 +1300,7 @@ def sendFirstGenAC(tlv, tid):
     global APPLICATION_LABEL, EMV_VERIFICATION
 
     # allow for decision on offline decline when issuing 1st GenAC (DNA)
-    #EMV_VERIFICATION = 0x01
-    EMV_VERIFICATION = 0x00
+    EMV_VERIFICATION = 0x01
 
     # TEMPLATE E2 - DECISION REQUIRED
     # Should the device require a decision to be made it will return this template. The template could
@@ -1024,7 +1333,7 @@ def sendFirstGenAC(tlv, tid):
                 AUTHRESPONSECODE,                               # TAG 8A
                 [(0xDF, 0xA2, 0x18), [0x00]],                   # Pin entry style
                 # note: this tag presence will cause DNA tests to fail - need to evaluate further when to include/exclude
-                CONTINUE_REQUEST_TC if ISOFFLINE else CONTINUE_REQUEST_AAC, # TAG C0 object decision: 00=AAC, 01=TC
+                CONTINUE_REQUEST_AAC if (ISOFFLINE or ISBALANCEINQUIRY) else CONTINUE_REQUEST_TC, # TAG C0 object decision: AAC=00, TC=01
                 QUICKCHIP_ENABLED
             ]
             # The terminal requests an ARQC in the 1st GENERATE AC Command.
@@ -1034,14 +1343,18 @@ def sendFirstGenAC(tlv, tid):
                 continue_tran_tag.append(CONTINUE_REQUEST_TC)
             continue_tpl = (0xE0, continue_tran_tag)
             message = str(appLabels[0], 'iso8859-1')
+            if tlv.tagCount((0x9f, 0x12)):
+                preferred = tlv.getTag((0x9f, 0x12))[0]
+                message = message + '\n\n\t* PREFERRED NAME *\n\t' + str(preferred, 'iso8859-1')
             displayMsg('* APPLICATION LABEL *\n\t' + message, 2)
             # save Application Label
             TC_TCLink.saveEMVASCIITag((APPLICATION_LABEL))
     else:
         continue_tpl = setFirstGenContinueTransaction()
 
-    log.log("CONTINUE TRANSACTION: GenAC1 -----------------------------------------------------------------------------")
-
+    log.log("CONTINUE TRANSACTION: GenAC1 ------------------------------------------------" )
+    log.log("ACC REQUEST" if (ISOFFLINE or ISBALANCEINQUIRY) else "TC REQUESTED")
+        
     # CONTINUE TRANSACTION [DE, D2]
     # P1, Bit 0 = 1 - Return after Cardholder verification EMV step.
     conn.send([0xDE, 0xD2, EMV_VERIFICATION, 0x00], continue_tpl)
@@ -1051,7 +1364,7 @@ def sendFirstGenAC(tlv, tid):
 
 def sendSecondGenAC(continue_tpl):
     # If we get here, we received Online Request. Continue with positive response.
-    log.log("CONTINUE TRANSACTION: GenAC2 -----------------------------------------------------------------------------")
+    log.log("CONTINUE TRANSACTION: GenAC2 ------------------------------------------------")
 
     # continue_tpl[1].append(ISSUER_AUTH_DATA)
 
@@ -1064,10 +1377,9 @@ def sendSecondGenAC(continue_tpl):
         AUTHRESPONSECODE,
         [(0xDF, 0xA2, 0x18), [0x00]],                                       # PIN Entry style
         [(0xDF, 0xA3, 0x07), [0x03, 0xE8]],
-        CONTINUE_REQUEST_TC if ISOFFLINE else CONTINUE_REQUEST_AAC,         # TAG C0 object decision:
-                                                                            # 00=AAC, 01=TC
-                                                                            # Issuer Authentication Data
-        ISSUER_AUTH_DATA,
+        CONTINUE_REQUEST_AAC if (ISOFFLINE or ISBALANCEINQUIRY) else CONTINUE_REQUEST_TC, # TAG C0 object decision: AAC=00, TC=01
+        # THIS IS CAUSING THE WORKFLOW TO REPORT External Authenticate Command
+        #ISSUER_AUTH_DATA,
         QUICKCHIP_ENABLED
     ]
     continue2_tpl = (0xE0, continue_trans_tag)
@@ -1153,13 +1465,16 @@ def startContactless(preferredAID=''):
         [(0x9A), DATE],                 # system date
         [(0x9F, 0x21), TIME],           # system time
         #[(0x9F,0x41), b'\x00\x01'],    # sequence counter
-        AUTHRESPONSECODE,
         CURRENCY_CODE,                  # currency code
         COUNTRY_CODE                    # country code
     ]
     # Sale / Purchase with cashback not allowed here
     if TRANSACTION_TYPE != b'\x09':
         start_ctls_tag.append([(0x9C), TRANSACTION_TYPE])
+
+    # to process ARQ in First Generate AC
+    if ISBALANCEINQUIRY:
+        start_ctls_tag.append([(0x95), b'\x00\x00\x00\x00\x00'])
     
     if len(preferredAID):
         # Preferred Application selected
@@ -1219,17 +1534,18 @@ def processCtlsAIDList(tlv):
             aid = TC_TransactionHelper.getValue('4f', value)
             #log.log("AID:" + aid)
             aidList.append(aid)
-            # 50: LABEL
-            label = TC_TransactionHelper.getValue('50', value)
+            # 50: LABEL - OFFSET = 4F+HH+len(aid)
+            label = TC_TransactionHelper.getValue('50', value[len(aid)+4:])
             label = bytes.fromhex(label)
             label = label.decode('ascii')
             #log.log("LABEL:" + label)
             lblList.append(label)
 
-        # only process multi-lists
+        # When 9f06 is two bytes long and there is only one AID on the list,
+        # it will be selected automatically
         if len(aidList) <= 1:
             return ''
-
+        
         log.log('We have ', len(lblList), ' applications')
 
         if len(lblList) != len(aidList):
@@ -1291,11 +1607,18 @@ def processCtlsAIDList(tlv):
 def processCtlsContinue():
 
     continue_ctls_tag = [
-        ACQUIRER_ID,
-        CONTINUE_REQUEST_AAC,
-        AUTHRESPONSECODE
+        ACQUIRER_ID
     ]
+    if ISBALANCEINQUIRY == True:
+        continue_ctls_tag.append(CONTINUE_REQUEST_AAC)
+    else:
+        continue_ctls_tag.append(AUTHRESPONSECODE)
+        continue_ctls_tag.append(CONTINUE_REQUEST_TC)
+                
     continue_ctls_templ = (0xE0, continue_ctls_tag)
+
+    log.log("CONTINUE CONTACTLESS TRANSACTION: GenAC1 -----------------------------" )
+    log.log("ACC REQUEST" if (ISOFFLINE or ISBALANCEINQUIRY) else "TC REQUESTED")
 
     # CONTINUE CONTACTLESS TRANSACTION [C0 A1]
     conn.send([0xC0, 0xA1, 0x00, 0x00], continue_ctls_templ)
@@ -1317,8 +1640,16 @@ def cancelContactless():
     status, buf, uns = getAnswer()
     # Ignore unsolicited as the answer WILL BE unsolicited...
     status, buf, uns = getAnswer(False)
-
-
+    tlv = TLVParser(buf)
+    if tlv.tagCount((0xdf,0xdf,0x30)):
+        #response = tlv.getTag((0xdf,0xdf,0x30))[0]
+        response = tlv.getTag((0xdf, 0xdf, 0x30), TLVParser.CONVERT_HEX_STR)[0].upper()
+        if response == 'FB':
+            log.log("Contactless transaction aborted successfully, no error")
+        else:
+            log.log("Contactless transaction aborted with error=0x" + response)
+                    
+                    
 # ---------------------------------------------------------------------------- #
 # EMV Contact Workflow
 # ---------------------------------------------------------------------------- #
@@ -1342,7 +1673,7 @@ def processEMV(tid):
         [(0x9F, 0x41), transaction_counter],        # transaction counter
         [(0xDF, 0xA2, 0x18), b'\x00'],              # pin entry style
         [(0xDF, 0xA2, 0x14), b'\x01'],              # Suppress Display
-        [(0xDF, 0xA2, 0x04), b'\x01'],              # Application selection using PINPAD
+        [(0xDF, 0xA2, 0x04), b'\x01'],              # External Application Selection
         #[(0xDF, 0xDF, 0x0D), b'\x02']              # Don't force transaction online
     ]
     start_templ = (0xE0, start_trans_tag)
@@ -1374,8 +1705,9 @@ def processEMV(tid):
                     displayMsg(DM_9F42, 2)
                     processNoCashbackAllowed(TLVParser(buf), tid)
 
-                log.logerr('Transaction terminated with status ', hex(status))
-                return -1
+                if TRANSACTION_TYPE != b'\x09':
+                    log.logerr('Transaction terminated with status ', hex(status))
+                    return -1
 
         if uns and status == 0x9000:
             tlv = TLVParser(buf)
@@ -1424,7 +1756,8 @@ def processEMV(tid):
     # Template E6 requests for PIN, so allow Template E4 to just submit the transaction (without collecting PIN again)
     hasPINEntry = False
     pinTryCounter = 0x00
-
+    bypassRequested = False
+    
     while True:
         # process response
         status, buf, uns = getEMVAnswer()
@@ -1446,13 +1779,22 @@ def processEMV(tid):
                     message = str(message[0], 'iso8859-1')
                     log.log(message)
                 pinTryCounter = tlv.getTag((0xC5))[0]
-                performUserPINEntry()
-                hasPINEntry = True
+                hasPINEntry = performUserPINEntry()
+                bypassRequested = False if hasPINEntry else True
                 # let device proceed to next step
+                    
                 continue
 
             else:
-                log.log('Ignoring unsolicited packet ', tlv)
+                # PIN Entry Bypass - unsolicited packet in format: [01 40 09 E6 05 C3 01 0E C4 00 90 00 33]
+                if hasPINEntry or buf[0][0] == 0xE6:
+                    if buf[0][2] == 0xC3:
+                        tranStatus = buf[0][4]
+                        if tranStatus == 0x0E:
+                            hasPINEntry = False
+                            log.logwarning("PIN ENTRY HAS BEEN BYPASSED")
+                else:
+                    log.log('Ignoring unsolicited packet ', tlv)
                 continue
         else:
             print(">> after continue first pass: ", str(tlv))
@@ -1476,10 +1818,13 @@ def processEMV(tid):
 
             if tlv.tagCount(0xE4):
 
+                TC_TCLink.saveEMVData(tlv, 0xE4)
+
                 # check Terminal Capabilities reports correctly - CONTACTLESS WORKFLOW
                 reportTerminalCapabilities(tlv)
 
                 cvm_value = TC_TransactionHelper.getCVMResult(tlv)
+                    
                 # NOT AN EROR, JUST EASIER TO FIND IN THE TERMINAL OUTPUT
                 log.logerr('CVM REQUESTED:', cvm_value)
 
@@ -1498,37 +1843,52 @@ def processEMV(tid):
                 if cvm_value == "ONLINE PIN":
                     if hasPINEntry == True:
                         # expect Template E6 already collected PIN: retrieve PIN KSN/ENCRYPTED DATA
-                        OnlinePinInTemplateE6(tlv, EMV_CARD_INSERTED, continue_tpl)
+                        OnlinePinInTemplateE6()
                         # save continue tpl in case of PIN retry
                         OnlinePinContinueTPL = continue_tpl
+                    
                         break
+						
                     # request PIN from user
-                    return OnlinePinTransaction(tlv, EMV_CARD_INSERTED, continue_tpl)
+                    if bypassRequested == False:
+                        return OnlinePinTransaction(tlv, EMV_CARD_INSERTED, continue_tpl)
 
+                # check for OFFLINE PIN ENTRY: KSN/ENCRYPTED DATA PAIR not to be extracted since PIN is OFFLINE verified
+                if "ENCRYPTED" in cvm_value or "PLAIN PIN" in cvm_value:
+                    hasPINEntry = False
+    
                 if cvm_value == "SIGNATURE":
                     SIGN_RECEIPT = True
 
-                if cvm_value == "PLAIN PIN":
+                #if cvm_value == "PLAIN PIN":
                     # verify PIN entry
                     # verifyOfflinePIN(pinTryCounter)
                     # set 2nd GENERATE AAC request
-                    if ISBALANCEINQUIRY == False:
-                        set2ndGenACC(continue_tpl)
-
-                TC_TCLink.saveEMVData(tlv, 0xE4)
+                    #if ISBALANCEINQUIRY == False:
+                    #set2ndGenACC(continue_tpl)
 
                 break
 
             if tlv.tagCount(0xE3):
-                log.log("Transaction approved offline")
-                displayMsg("APPROVED", 2)
-                return -1
+                if ISBLINDREFUND:
+                    log.log("Transaction is blind refund")
+                    TC_TCLink.saveCardData(tlv)
+                    TC_TCLink.saveEMVData(tlv, 0xE3, True)
+                    return 8
+                else:
+                    log.log("Transaction approved offline")
+                    displayMsg("APPROVED", 2)
+                    return -1
 
             if tlv.tagCount(0xE5):
-                log.log("Transaction declined offline")
+                log.logerr('TRANSACTION DECLINED OFFLINE')
                 displayMsg("DECLINED: OFFLINE", 2)
-                return -1
-
+                # M-TIP10 Test 01 Scenario 01f – Offline decline : Analyst wants receipt to be provided for the test case
+                #return -1
+                TC_TCLink.saveCardData(tlv)
+                TC_TCLink.saveEMVData(tlv, 0xE5)
+                return 2
+            
             break
 
     # -------------------------------------------------------------------------
@@ -1548,7 +1908,7 @@ def processEMV(tid):
 
     if tlv.tagCount(0xE4) and ISOFFLINE:  # Online Action Required
 
-        log.log("CONTINUE TRANSACTION: GenAC2 [TEMPLATE E4] ---------------------------------------------------------------")
+        log.log("CONTINUE TRANSACTION: GenAC2 [TEMPLATE E4] ----------------------------------")
 
         # -------------------------------------------------------------------------
         # 2nd GenAC
@@ -1557,16 +1917,34 @@ def processEMV(tid):
         if tlv == -1:
             return -1
 
+        # retrieve PIN entered
+        if hasPINEntry == True:
+            # expect Template E6 already collected PIN: retrieve PIN KSN/ENCRYPTED DATA
+            OnlinePinInTemplateE6()
+            # save continue tpl in case of PIN retry
+            OnlinePinContinueTPL = continue_tpl
+
         TC_TCLink.saveEMVData(tlv, 0xE4)
 
         return 3
 
     if tlv.tagCount(0xE5):
-        log.log("Transaction declined")
+        log.logerr('TRANSACTION DECLINED OFFLINE')
 
         # Check for Contact EMV Capture
         #print(">>> EMV Data 3 ff7f", tlv.tagCount((0xFF,0x7F)))
+        
+        if hasPINEntry == True:
+            # expect Template E6 already collected PIN: retrieve PIN KSN/ENCRYPTED DATA
+            if len(OnlineEncryptedPIN) == 0 or len(OnlinePinKSN) == 0:
+                # save EMV Tags
+                TC_TCLink.saveEMVData(tlv, 0xE5)
+                OnlinePinInTemplateE6()
+            # save continue tpl in case of PIN retry
+            OnlinePinContinueTPL = continue_tpl
+
         TC_TCLink.saveCardData(tlv)
+            
         return 6 if hasPINEntry else 2
 
     # Check for Contact EMV Capture
@@ -1606,7 +1984,8 @@ def processTransaction(args):
     global TRANSACTION_TYPE, ISBALANCEINQUIRY, FALLBACK_TYPE
     global OnlineEncryptedPIN, OnlinePinKSN, OnlinePinContinueTPL
 
-    TC_TCLink.SetProperties(args, log)
+    TC_TCLink.SetProperties(args, log, TRANSACTION_TYPE == b'\x09')
+    
     if args.amtother != 0:
         AMOUNT = TC_TransactionHelper.bcd(args.amount + args.amtother, 6)
         AMTOTHER = TC_TransactionHelper.bcd(args.amtother, 6)
@@ -1618,15 +1997,6 @@ def processTransaction(args):
     TIME = TC_TransactionHelper.bcd(now.hour % 100) + TC_TransactionHelper.bcd(now.minute) + TC_TransactionHelper.bcd(now.second)
     #print("Amount", str(AMOUNT), "vs", str(b'\x00\x00\x00\x00\x01\x00'))
     #print("Date", str(DATE), "Time", str(TIME))
-    req_unsolicited = conn.connect()
-    if req_unsolicited:
-        # Receive unsolicited
-        log.log('Waiting for unsolicited')
-        #status, buf, uns = getAnswer(False)
-        #log.log('Unsolicited', TLVParser(buf) )
-
-    # abort current transaction
-    AbortTransaction()
 
     # RESET DEVICE [D0, 00]
     buf = ResetDevice()
@@ -1671,7 +2041,7 @@ def processTransaction(args):
         if tlv.tagCount(0x48):
             cardState = EMVCardState(tlv)
 
-    ctls = 0x00 if ISBALANCEINQUIRY else initContactless()
+    ctls = initContactless()
     if (cardState != EMV_CARD_INSERTED):
         if (ctls):
             startContactless()
@@ -1695,10 +2065,19 @@ def processTransaction(args):
                 if tlv.tagCount(0x48):
                     cardState = EMVCardState(tlv)
                     magState = MagstripeCardState(tlv)
+                    
+                    # normal MSR workflow   
+                    if magState == MAGSTRIPE_CARD_SWIPE:
+                        tlv = removeEMVCard()
+                        if tlv.tagCount(0x48):
+                            cardState = EMVCardState(tlv)
+                            magState = MagstripeCardState(tlv)
+ 
                     # Ignore failed swipes
                     if ctls and (cardState == EMV_CARD_INSERTED or magState == MAGSTRIPE_TRACKS_AVAILABLE):
                         # Cancel Contactless first
                         cancelContactless()
+                        
                     if cardState == EMV_CARD_INSERTED:
                         log.log("Card inserted, process EMV transaction!")
                         result = processEMV(tid)
@@ -1706,11 +2085,15 @@ def processTransaction(args):
                             return
                         if result == 5:  # msr fallback result
                             tranType = 2
-                        if result == 6:
+                        elif result == 6:
                             tranType = 6
+                        elif result == 8:
+                            tranType = 8
                         else:
                             if result != -1:
                                 tranType = 1
+                            else:
+                                tlv = getCardStatus()
                         break
                     else:
                         if cardState == ERROR_UNKNOWN_CARD:
@@ -1759,9 +2142,12 @@ def processTransaction(args):
                                     tranType = 2
                                     break
                                 else:
-                                    TC_TransactionHelper.displayEncryptedTrack(tlv)
-                                    break
-
+                                    if (TC_TransactionHelper.displayEncryptedTrack(tlv, log) == True):
+                                        break
+                                    else:
+                                        promptForReinsertCard()
+                                        log.log('**** WAIT FOR CARD INSERTION / TAP / SWIPE ****')
+                                        
                     log.log("Waiting for next occurrance!")
                     continue
 
@@ -1772,7 +2158,9 @@ def processTransaction(args):
                     if kbd_tag_val == 27:
                         break
                     continue
-                TC_TCLink.saveCardData(tlv)
+                
+                if args.action != 'credit':
+                    TC_TCLink.saveCardData(tlv)
 
                 # TAG FF7F
                 #vsdSREDTemplateDebugger(tlv, tid)
@@ -1781,10 +2169,14 @@ def processTransaction(args):
                 if tlv.tagCount(0xE3):  # E3 = transaction approved
                     log.log("Approved contactless EMV transaction!")
                     displayMsg("APPROVED", 2)
-                    # todo: vsp decrypt!
-                    TC_TransactionHelper.vspDecrypt(tlv, tid, log)
-                    TC_TCLink.saveEMVData(tlv, 0xE3)
-                    tranType = 4
+                    
+                    if args.action == 'credit':
+                        tranType = 7
+                    else:
+                        # todo: vsp decrypt!
+                        TC_TransactionHelper.vspDecrypt(tlv, tid, log)
+                        TC_TCLink.saveEMVData(tlv, 0xE3, ISBLINDREFUND)
+                        tranType = 4
                     break
 
                 # TEMPLATE E4: ONLINE ACTION REQUIRED
@@ -1795,23 +2187,34 @@ def processTransaction(args):
 
                     TC_TransactionHelper.vspDecrypt(tlv, tid, log)
                     TC_TCLink.saveEMVData(tlv, 0xE4)
+                    
                     # ADDED 08312020. Extract 9f34 tag (online pin entry required?)
                     if (tlv.tagCount((0x9F, 0x34)) >= 1):
                         cvm_result = tlv.getTag((0x9F, 0x34))[0]
                         encrypted_pin = (cvm_result[0] & 0x0f)
                         # Indicate CVM type
                         switcher = {
+                            1: "PLAIN PIN BY ICC",
                             2: "ONLINE PIN",
                             14: "SIGNATURE",
                             15: "NO CVM PERFORMED"
                         }
                         cvm_value = switcher.get(encrypted_pin, "UNKNOWN CVM TYPE")
+                        
                         # NOT AN EROR, JUST EASIER TO FIND IN THE TERMINAL OUTPUT
                         log.logerr('CVM REQUESTED:', cvm_value)
 
-                        # note: this might need review since it was only tested for AMEX CLESS
+                        # VISA: In the instance of a cash or cashback transaction an online PIN is always required,
+                        # regardless of what CVM method might be indicated in the CTQ (tag '9F6C')
+                        if (TRANSACTION_TYPE == b'\x09' and cvm_value != "ONLINE PIN"):
+                            encrypted_pin = 0x02
+
                         if (encrypted_pin == 0x02):
                             return OnlinePinTransaction(tlv, cardState, setFirstGenContinueTransaction())
+
+                        # offline PIN
+                        if (encrypted_pin == 0x01):
+                            getPINEntry(tlv)
 
                     if cardState != EMV_CARD_INSERTED:
                         processCtlsContinue()
@@ -1823,16 +2226,19 @@ def processTransaction(args):
                 if tlv.tagCount(0xE5):
                     tranType = 4
                     TC_TCLink.saveEMVData(tlv, 0xE5)
-                    log.logerr('TRANSACTION OFFLINE DECLINED')
-                    performCleanup()
-                    return
-
+                    log.logerr('TRANSACTION DECLINED OFFLINE')
+                    # E2E CL 17: requires TO GO ONLINE
+                    #performCleanup()
+                    #return
+                    break
+                
                 # TEMPLATE E7: CONTACTLESS MAGSTRIPE TRANSACTION
                 if tlv.tagCount(0xE7):
                     # Terminal Capabilites
                     reportTerminalCapabilities(tlv)
                     TC_TransactionHelper.vspDecrypt(tlv, tid, log)
-                    TC_TCLink.saveEMVData(tlv, 0xE7)
+                    # Contactless MSD does not include EMV Payload
+                    #TC_TCLink.saveEMVData(tlv, 0xE7)
                     processCtlsContinue()
                     tranType = 3
                     break
@@ -1858,6 +2264,8 @@ def processTransaction(args):
                     displayMsg(DM_9F28, 3)
                 if status == 0x9f35:
                     displayMsg(DM_9F35, 3)
+                    # re-arm device without exiting
+                    continue
                 log.log('*** COMPLETED WITH EXPECTED ERROR IN STATE ***')
                 log.logerr('Pinpad reported error ', hex(status))
                 performCleanup()
@@ -1897,10 +2305,13 @@ def processTransaction(args):
                 return
 
             if status == 0x9f34:
-                displayMsg(DM_9F34, 3)
+                # Test Case Requires to Indicate a DECLINE state for the transaction
+                displayMsg("DECLINED: OFFLINE", 5)
+
+                #displayMsg(DM_9F34)
                 log.log('*** COMPLETED WITH EXPECTED ERROR IN STATE ***')
                 log.logerr('Pinpad reported error ', hex(status))
-
+                
                 # Restart request for card insertion only
                 promptForCard()
                 # No need to exit the loop - ctls is not active now, but we have to disable swipes
@@ -1937,18 +2348,22 @@ def processTransaction(args):
 
         if tranType == 1:
             # If card still inserted, ask for removal
-            removeEMVCard()
+            cardState = getEMVCardStatus()
+            if cardState == EMV_CARD_INSERTED:
+                removeEMVCard()
         else:
             # Delay for some CLess messaging to complete; may be able to replace with loop awaiting card removed from field
             sleep(0.500)
 
-        # Check for Card data
-        TC_TCLink.saveCardData(tlv)
+        if tranType != 6 and args.action != 'credit':
+            # Check for Card data
+            TC_TCLink.saveCardData(tlv)
 
-        # Processing Transaction
-        # DISPLAY [D2 01]
-        conn.send([0xD2, 0x01, 0x02, 0x01])
-        sleep(3)
+            # MSR workflow now asks for Credit/Debit selection (Debit collects PIN)
+            if tranType != 2:
+                # DISPLAY [D2 01] - Processing Transaction
+                conn.send([0xD2, 0x01, 0x02, 0x01])
+                sleep(3)
 
         # Check for Contact EMV Capture
         #print(">>> tranType", tranType, "ff7f", tlv.tagCount((0xFF,0x7F)))
@@ -1960,7 +2375,14 @@ def processTransaction(args):
         # Check for swipe
         if tranType == 2:
             #print(">>> ff7f", tlv.tagCount((0xFF,0x7F)))
-            response = TC_TCLink.processMSRTransaction()
+            TC_TransactionHelper.displayEncryptedTrack(tlv, log)
+            choice = selectCreditOrDebit()
+            # refunds don't need pin block
+            if (choice == 2 and args.action != "credit"):
+                getPINEntry(tlv)
+            # DISPLAY [D2 01] - Processing Transaction
+            conn.send([0xD2, 0x01, 0x02, 0x01])
+            response = TC_TCLink.processMSRTransaction(OnlineEncryptedPIN, OnlinePinKSN, args.action == 'credit', ISBLINDREFUND)
         # Check for contactless magstripe
         if tranType == 3:
             #print(">>> ff7f", tlv.tagCount((0xFF,0x7F)))
@@ -1968,21 +2390,34 @@ def processTransaction(args):
         # Check for Offline approve/decline
         if tranType == 4:  # Should tags be captured for an Offline Decline case and sent to TCLink?
             #print(">>> ff7f", tlv.tagCount((0xFF,0x7F)))
-            response = TC_TCLink.processEMVTransaction()
+            response = TC_TCLink.processEMVTransaction(ISBLINDREFUND)
         # Check for CLess
         if tranType == 5:
             #print(">>> ff7f", tlv.tagCount((0xFF,0x7F)))
-            response = TC_TCLink.processEMVTransaction()
+            response = TC_TCLink.processEMVTransaction(ISBLINDREFUND)
         # online PIN transaction
         if tranType == 6:
             log.log('PROCESS ONLINE PIN TRANSACTION: ------------------------------------------------------------------------')
             response = TC_TCLink.processPINTransaction(OnlineEncryptedPIN, OnlinePinKSN)
             log.log("PIN response: " + response)
+            # should there be a retry after first pin entry failure?
             if response != "approved":
                 displayMsg('Invalid PIN:' + response, 3)
-                OnlinePinTransaction(tlv, cardState, OnlinePinContinueTPL, True, 1)
-            # delay to complete
+                nextstep = OnlinePinTransaction(tlv, cardState, OnlinePinContinueTPL, 1, True)
+                if nextstep == -1:
+                    response = ''
+            else:
+                # delay to complete
+                removeEMVCard()
+        # CREDIT transaction
+        if tranType == 7:
+            log.log('PROCESS CREDIT TRANSACTION: ------------------------------------------------------------------------')
+            response = TC_TCLink.processCreditTransaction()
+        
+        if tranType == 8:
+            response = TC_TCLink.processEMVTransaction(True)
             removeEMVCard()
+            
         # offline transaction
         if tranType == 0:
             response = "OFFLINE: " + OFFLINERESPONSE
@@ -2036,8 +2471,6 @@ if __name__ == '__main__':
                      help='Amount of transaction')
     arg.add_argument('--amtother', dest='amtother', default='0', type=int,
                      help='Amount other')
-    arg.add_argument('--cashback', dest='cashback', default=None, type=int,
-                     help='Cashback Amount')
     arg.add_argument('--operator', dest='operator', default=getpass.getuser(),
                      help='Operator for transaction')
     arg.add_argument('--lanenumber', dest='lanenumber', default=None,
@@ -2046,7 +2479,7 @@ if __name__ == '__main__':
                      help='Online PIN')
     arg.add_argument('--pinattempts', dest='pinattempts', default=1, type=int,
                      help='Online PIN attempts allowed')
-    arg.add_argument('--msrfallback', dest='msrfallback', default=1, type=int,
+    arg.add_argument('--msrfallback', dest='msrfallback', default=3, type=int,
                      help='Insert attempts allowed before MSR fallback')
     arg.add_argument('--device_pinpad_capable', dest='device_pinpad_capable', default='n',
                      help='UNATTENDED device pin capability only')
@@ -2054,40 +2487,84 @@ if __name__ == '__main__':
                      help='Ask user to validate amount')
     arg.add_argument('--partialauth', dest='partialauth', default='n',
                      help='Partial authorization')
+    arg.add_argument('--transaction_menu', dest='transaction_menu', default='y',
+                     help='display transaction menu')
 
     args = util.parse_args()
+
+    # instantiate connection to device
+    conn = connection.Connection()
+    startConnection()
+
+    # selection transaction type from menu
+    if args.transaction_menu == 'y':
+        transactionType = selectTransaction()
+        displayMsg('\tTRANSACTION TYPE\r\n\t' + TransactionType[transactionType][1])
+        TRANSACTION_TYPE = TransactionType[transactionType][0]
+    else:
+        transactionType = 1
+        
+    if TRANSACTION_TYPE == b'\x20':
+        ISBLINDREFUND = True if transactionType == 7 else False
+        transId = TC_TCLink.getTransIdFromFile()
+        if len(transId) == 0:
+            log.logerr('CANNOT ISSUE REFUND: NO TRANSACTION HAS YET BEEN RUN.')
+            exit(0)
+        log.logwarning('LAST TRANSACTION ID: ' + transId)
+        if ISBLINDREFUND:
+            args.action = "credit2"
+        else:
+            args.action = "credit"
+
+    # set balance inquiry in launch.json
+    if TRANSACTION_TYPE == b'\x30':
+        args.action = "verify"
+        ISBALANCEINQUIRY = True
+        log.log('BALANCE INQUIRY? - TRANSACTION TYPE=' +
+            hexlify(TRANSACTION_TYPE).decode('ascii'))
 
     # Transaction Amount
     if args.validateAmount == 'y':
         TransactionAmount = input("ENTER AMOUNT (" + str(args.amount) + "): ")
 
-        if len(TransactionAmount) > 1:
+        if len(TransactionAmount) > 1 or ISBALANCEINQUIRY:
             value = int(TransactionAmount)
-            if value > 0:
+            if value > 0 or ISBALANCEINQUIRY:
                 args.amount = value
 
+    # check amount > cashback
+    if transactionType == 3:
+        amount = int(args.amount)
+        cashback = int(args.amtother)
+        if cashback >= amount:
+            log.logerr("AMOUNT-CASHBACK CANNOT BE 0 or LESS", args.amtother)
+            exit(0)
+ 
     if args.amount != 0:
         log.log('TRANSACTION AMOUNT: $', args.amount)
-        if TRANSACTION_TYPE == b'\x09':
-            args.cashback = "0300"
-            log.log('CASHBACK AMOUNT   : $', args.cashback)
-    else:
-        # set balance inquiry in launch.json
-        if args.action == 'verify':
-            TRANSACTION_TYPE = b'\x30'
-            ISBALANCEINQUIRY = True
-        log.log('BALANCE INQUIRY? - TRANSACTION TYPE=' +
-                hexlify(TRANSACTION_TYPE).decode('ascii'))
+        if transactionType == 3:
+            log.log('CASHBACK AMOUNT   : $', args.amtother)
 
     if(args.amtother != 0):
         log.log('TRANSACTION AMOUNT OTHER: $', args.amtother)
         log.log('TOTAL TRANSACTION AMOUNT: $', args.amount + args.amtother)
 
-    conn = connection.Connection()
-
+    log.logwarning('TRANSACTION TYPE  : "' + TransactionType[transactionType][1] +
+                   '", CODE=' + hexlify(TRANSACTION_TYPE).decode('ascii') +
+                   ', ACTION=' + args.action.upper())
+    sleep(2)
+    
     #print('custid=' + str(args.custid) + ",password=" + str(args.password) + ",action=" + str(args.action))
     #print('DEVICE PINPAD CAPABLE=' + str(args.device_pinpad_capable))
 
     utility.register_testharness_script(
         partial(processTransaction, args))
-    utility.do_testharness()
+    while True:
+        utility.do_testharness()
+        exit(0)
+        TransactionAmount = input("Ctrl+C to quit or ENTER NEW AMOUNT (" + str(args.amount) + "): ")
+        if len(TransactionAmount) > 1 or ISBALANCEINQUIRY:
+            value = int(TransactionAmount)
+            if value > 0 or ISBALANCEINQUIRY:
+                args.amount = value
+

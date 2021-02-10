@@ -44,6 +44,9 @@ IS_FALLBACK = 'n'
 FALLBACK_TYPE = ''
 ISBALANCEINQUIRY = False
 
+# REFUND / CREDIT
+TRANSACTION_ID = ''
+
 # EMV tags to map to TCLink as Hex data
 EMV_TAGS_HEX_MAP = {
     (0x4F, ): 'emv_4f_applicationidentifiericc',
@@ -93,7 +96,7 @@ EMV_TAGS_HEX_MAP = {
     (0x9F, 0x5B): 'emv_9f5b_issuerscriptresults',
     (0x9F, 0x6E): 'emv_9f6e_thirdpartydata',
     (0x9F, 0x7C): 'emv_9f7c_merchantcustomdata',
-    # ( 0x9F, 0x66 ) : 'emv_9f66_ttq',
+    (0x9F, 0x66): 'emv_9f66_ttq',
     # emv_kernel_version
     # emv_fallback
     # emv_fallback_type
@@ -130,9 +133,9 @@ AID_LISTS = {
             b'A0000000043060'        # MasterCard International Maestro
         ],
         'debitAidList': [
-            b'A0000000043060'        # MasterCard International Maestro
-            b'A0000002771010'        # Interact
-            b'A0000006200620'        # DNA US Common Debit
+            b'A0000000043060',       # MasterCard International Maestro
+            b'A0000002771010',       # Interact
+            b'A0000006200620',       # DNA US Common Debit
         ],
         'creditAidList': [
             b'A0000000041010',       # MasterCard Credit
@@ -207,9 +210,9 @@ AID_LISTS = {
         ],
         'debitAidList': [
             b'A0000000043060',       # MasterCard International Maestro
-            b'A0000000033010'        # Visa Interlink Global Debit
-            b'A0000006200620'        # DNA US Common Debit
-            b'A0000002771010'        # Interact
+            b'A0000000033010',       # Visa Interlink Global Debit
+            b'A0000006200620',       # DNA US Common Debit
+            b'A0000002771010',       # Interact
         ],
         'creditAidList': [
             b'A00000002501',         # Amex
@@ -304,18 +307,18 @@ def saveCardData(tlv):
         #	print(">>> saveCardData vsp_tlv DFDF12", hexlify(vsp_tlv.getTag((0xDF,0xDF,0x12))[0]))
         if vsp_tlv.tagCount((0xDF, 0xDF, 0x10)) and vsp_tlv.tagCount((0xDF, 0xDF, 0x11)) and vsp_tlv.tagCount((0xDF, 0xDF, 0x12)):
             print(">>> saveCardData save data")
-            ENCRYPTED_TRACK_IV = vsp_tlv.getTag(
-                (0xDF, 0xDF, 0x12))[0].hex().upper()
-            ENCRYPTED_TRACK_KSN = vsp_tlv.getTag(
-                (0xDF, 0xDF, 0x11))[0].hex().upper()
-            ENCRYPTED_TRACK_DATA = vsp_tlv.getTag(
-                (0xDF, 0xDF, 0x10))[0].hex().upper()
+            ENCRYPTED_TRACK_IV = vsp_tlv.getTag((0xDF, 0xDF, 0x12))[0].hex().upper()
+            ENCRYPTED_TRACK_KSN = vsp_tlv.getTag((0xDF, 0xDF, 0x11))[0].hex().upper()
+            ENCRYPTED_TRACK_DATA = vsp_tlv.getTag((0xDF, 0xDF, 0x10))[0].hex().upper()
 
 # Capture/update EMV data values
-def saveEMVData(tlv, template):
+def saveEMVData(tlv, template, isBlindRefund = False):
     global LOG_INTERNAL_DATA, LOG
     global EMV_TAGS, POS_ENTRY_MODE, EMV_PROCESSING_CODE
     global PLATFORM, AID_TAGS, AID_LISTS
+    
+    tag84HasBeenAdded = False
+    
     #print("saveEMVData", str(template))
     processingcode = 'credit'
     if LOG_INTERNAL_DATA:
@@ -332,7 +335,8 @@ def saveEMVData(tlv, template):
                 # CLess EMV (07) or CLess Magstrip (91)
                 if tag[1] == b'\x07' or tag[1] == b'\x91':
                     #print(">> POS Mode", tag[1])
-                    POS_ENTRY_MODE = 'contactless=y'
+                    if ISBALANCEINQUIRY == False and isBlindRefund == False:
+                        POS_ENTRY_MODE = 'contactless=y'
             if tag[0] == (0xBF, 0x0C):
                 try:
                     fci_data_padded = padTLVData(tag[1])
@@ -356,8 +360,8 @@ def saveEMVData(tlv, template):
                     print(">> AID is ", aid_value)
 
                     # TAG 84: Application Identifier
-                    saveEMVHEXMapTag(
-                        ((0x84, ), aid_value.decode('utf-8').upper()), False)
+                    if tag84HasBeenAdded == False:
+                        saveEMVHEXMapTag(((0x84, ), aid_value.decode('utf-8').upper()), False)
 
                     platform = PLATFORM
                     if platform not in AID_LISTS.keys():
@@ -388,6 +392,9 @@ def saveEMVData(tlv, template):
                     EMV_TAGS[EMV_TAGS_HEX_MAP[tag[0]]] = tag[1].hex().upper()
                     #print(">>  EMV_TAGS now ", str(EMV_TAGS))
                     #print(">>  EMV_TAGS added hex ", EMV_TAGS_HEX_MAP[tag[0]], "=", EMV_TAGS[EMV_TAGS_HEX_MAP[tag[0]]])
+                    # multiple entries of this tag in AID_TAGS processing
+                    if tag[0] == ((0x84, )):
+                        tag84HasBeenAdded = True
                 except:
                     LOG.log(">>  EMV_TAGS skipped ", hexlify(
                         bytearray(tag[0])), "=", hexlify(tag[1]))
@@ -430,16 +437,16 @@ def printEMVHexTags():
     print(">>  EMV_TAGS now ", str(EMV_TAGS))
 
 
-def SetProperties(args, log):
-    global LOG_INTERNAL_DATA, LOG, DEVICE_PINPAD_CAPABLE, PARTIAL_AUTH, ISBALANCEINQUIRY, CASHBACK_AMOUNT
+def SetProperties(args, log, hasCashback = False):
+    global LOG_INTERNAL_DATA, LOG, DEVICE_PINPAD_CAPABLE, PARTIAL_AUTH, ISBALANCEINQUIRY
 
     if args.action == 'verify':
         ISBALANCEINQUIRY = True
     else:
         PARTIAL_AUTH = str(args.partialauth)
 
-    if args.cashback != None and len(args.cashback):
-        tclink.PushNameValue("cashback="+str(args.cashback))
+    if hasCashback and args.amtother > 0:
+        tclink.PushNameValue("cashback="+str(args.amtother))
         
     DEVICE_PINPAD_CAPABLE = str(args.device_pinpad_capable)
 
@@ -463,7 +470,7 @@ def SetProperties(args, log):
         pass
     try:
         if ISBALANCEINQUIRY == False:
-            tclink.PushNameValue("amount="+str(args.amount))
+            tclink.PushNameValue("amount="+str(args.amount + args.amtother))
     except:
         pass
     try:
@@ -476,6 +483,23 @@ def SetProperties(args, log):
         pass
 
 
+def saveTransIdToFile(transId):
+    with open('TransactionId.txt', 'w') as file:
+        file.write(transId)
+
+
+def getTransIdFromFile():
+    global TRANSACTION_ID
+    
+    try:
+        f = open("TransactionId.txt", "r")
+        TRANSACTION_ID = f.read()
+    except:
+        pass
+    
+    return TRANSACTION_ID
+
+
 def showTCLinkResponse():
     status = 'unknown'
     try:
@@ -485,7 +509,9 @@ def showTCLinkResponse():
     print("Status:", status)
 
     try:
-        print("TransID:", tclink.GetResponse("transid"))
+        transId = tclink.GetResponse("transid")
+        print("TransID:", transId)
+        saveTransIdToFile(transId)
     except:
         pass
     try:
@@ -509,7 +535,7 @@ def getDeclineType():
     return declinetype
 
 
-def addEMVTagData():
+def addEMVTagData(isBlindRefund):
     global EMV_TAGS, POS_ENTRY_MODE, EMV_PROCESSING_CODE, DEVICE_PINPAD_CAPABLE, PARTIAL_AUTH, ISBALANCEINQUIRY
 
     # override section
@@ -536,7 +562,7 @@ def addEMVTagData():
         "device_pinpad_capable": DEVICE_PINPAD_CAPABLE
     }
 
-    if ISBALANCEINQUIRY == False:
+    if ISBALANCEINQUIRY == False and isBlindRefund == False:
         OVERRIDE_TAGS["partialauth"] = PARTIAL_AUTH
 
     print("Override tags used:")
@@ -559,33 +585,49 @@ def addEMVTagData():
     if len(EMV_TAGS) > 0:
         if ISBALANCEINQUIRY == False:
             tclink.PushNameValue("quickchip=y")
-        tclink.PushNameValue("emv_processingcode=" + EMV_PROCESSING_CODE)
+        if len(EMV_PROCESSING_CODE):
+            tclink.PushNameValue("emv_processingcode=" + EMV_PROCESSING_CODE)
 
         for tag, data in EMV_TAGS.items():
             tclink.PushNameValue(tag + "=" + data)
 
 
-def processMSRTransaction():
+def processMSRTransaction(encryptedPIN, ksn, iscredit, isBlindRefund):
     global DEVICE_SERIAL, DEVICE_UNATTENDED, ENCRYPTED_TRACK_IV, ENCRYPTED_TRACK_KSN, ENCRYPTED_TRACK_DATA
-    global IS_FALLBACK, FALLBACK_TYPE, MSR_TRACK2_DATA, MSR_EXPIRY_DATA
-    
+    global IS_FALLBACK, FALLBACK_TYPE, MSR_TRACK2_DATA, MSR_EXPIRY_DATA, PARTIAL_AUTH
+    global TRANSACTION_ID
+ 
     print(">>> processMSRTransaction iv", ENCRYPTED_TRACK_IV)
     # NOTE: John L. noted we should not send 'emv_processingcode=credit' for fallback
     tclink.PushNameValue("emv_device_capable=y")
-    tclink.PushNameValue("encryptedtrack="+"TVP|iv:"+ENCRYPTED_TRACK_IV +
-                         "|ksn:"+ENCRYPTED_TRACK_KSN+"|vipa:"+ENCRYPTED_TRACK_DATA)
+
+    # credit transaction does not include encryptedtrack or pin
+    if iscredit == True:
+        tclink.PushNameValue("transid="+TRANSACTION_ID)
+    else:    
+        tclink.PushNameValue("encryptedtrack="+"TVP|iv:"+ENCRYPTED_TRACK_IV +
+                            "|ksn:"+ENCRYPTED_TRACK_KSN+"|vipa:"+ENCRYPTED_TRACK_DATA)
+        if isBlindRefund == True:
+            tclink.PushNameValue("reftransid="+TRANSACTION_ID)
+        else:
+            tclink.PushNameValue("unattended="+DEVICE_UNATTENDED)
+            tclink.PushNameValue("partialauth="+ PARTIAL_AUTH)
+        if len(encryptedPIN) and len(ksn):
+            tclink.PushNameValue("pin=" + encryptedPIN + ksn)
+                
     tclink.PushNameValue("aggregators=1")
     tclink.PushNameValue("aggregator1=L9XPR6")
     tclink.PushNameValue("device_serial="+DEVICE_SERIAL)
-    tclink.PushNameValue("unattended="+DEVICE_UNATTENDED)
+	
     if IS_FALLBACK == 'y':
         tclink.PushNameValue("emv_fallback=y")
         tclink.PushNameValue("emv_fallback_type="+FALLBACK_TYPE)
+    #tclink.PushNameValue("plpos_debit=y")
 	#TODO: add in next test iteration
     #if len(MSR_TRACK2_DATA) and len(MSR_EXPIRY_DATA):
     #    tclink.PushNameValue("track2="+MSR_TRACK2_DATA)
     #    tclink.PushNameValue("exp="+MSR_EXPIRY_DATA)
-        
+      
     # print("encryptedtrack="+"TVP|iv:"+ENCRYPTED_TRACK_IV+"|ksn:"+ENCRYPTED_TRACK_KSN+"|vipa:"+ENCRYPTED_TRACK_DATA)
     tclink.Submit()
     return showTCLinkResponse()
@@ -603,16 +645,21 @@ def processCLessMagstripeTransaction():
     tclink.PushNameValue("aggregator1=L9XPR6")
     tclink.PushNameValue("device_serial="+DEVICE_SERIAL)
     tclink.PushNameValue("unattended="+DEVICE_UNATTENDED)
-    print(">> ClessMagstripe: len(EMV_TAGS)", str(len(EMV_TAGS)))
-    addEMVTagData()
+    
+    # these tags might not be necessary for Contactless MSR
+    #print(">> ClessMagstripe: len(EMV_TAGS)", str(len(EMV_TAGS)))
+    #addEMVTagData(False)
+    
     # print("encryptedtrack="+"TVP|iv:"+ENCRYPTED_TRACK_IV+"|ksn:"+ENCRYPTED_TRACK_KSN+"|vipa:"+ENCRYPTED_TRACK_DATA)
     #print(">> EMV_TAGS", str(EMV_TAGS))
     tclink.Submit()
     return showTCLinkResponse()
 
 
-def processEMVTransaction():
+def processEMVTransaction(isBlindRefund = False):
     global DEVICE_SERIAL, DEVICE_UNATTENDED, ENCRYPTED_TRACK_IV, ENCRYPTED_TRACK_KSN, ENCRYPTED_TRACK_DATA, EMV_TAGS
+    global TRANSACTION_ID
+    
     #print(">>> processEMVTransaction iv", ENCRYPTED_TRACK_IV)
     # tclink.PushNameValue("_transid_override=100-1000010001")
     tclink.PushNameValue("emv_device_capable=y")
@@ -621,9 +668,12 @@ def processEMVTransaction():
     tclink.PushNameValue("aggregators=1")
     tclink.PushNameValue("aggregator1=L9XPR6")
     tclink.PushNameValue("device_serial="+DEVICE_SERIAL)
-    tclink.PushNameValue("unattended="+DEVICE_UNATTENDED)
+    if isBlindRefund == True:
+        tclink.PushNameValue("reftransid="+TRANSACTION_ID)
+    else:
+        tclink.PushNameValue("unattended="+DEVICE_UNATTENDED)
     print(">> EMV: len(EMV_TAGS)", str(len(EMV_TAGS)))
-    addEMVTagData()
+    addEMVTagData(isBlindRefund)
     # print("encryptedtrack="+"TVP|iv:"+ENCRYPTED_TRACK_IV+"|ksn:"+ENCRYPTED_TRACK_KSN+"|vipa:"+ENCRYPTED_TRACK_DATA)
     #Sprint(">> EMV_TAGS", str(EMV_TAGS))
     tclink.Submit()
@@ -633,7 +683,8 @@ def processEMVTransaction():
 def processPINTransaction(encryptedPIN, ksn):
     global DEVICE_SERIAL, DEVICE_UNATTENDED, ENCRYPTED_TRACK_IV, ENCRYPTED_TRACK_KSN, ENCRYPTED_TRACK_DATA, EMV_TAGS
     print("Encrypted pin/ksn", encryptedPIN, ksn)
-    tclink.PushNameValue("pin=" + encryptedPIN + ksn)
+    if len(encryptedPIN) and len(ksn):
+        tclink.PushNameValue("pin=" + encryptedPIN + ksn)
     tclink.PushNameValue("emv_device_capable=y")
     tclink.PushNameValue("encryptedtrack="+"TVP|iv:"+ENCRYPTED_TRACK_IV +
                          "|ksn:"+ENCRYPTED_TRACK_KSN+"|vipa:"+ENCRYPTED_TRACK_DATA)
@@ -642,6 +693,12 @@ def processPINTransaction(encryptedPIN, ksn):
     tclink.PushNameValue("device_serial="+DEVICE_SERIAL)
     tclink.PushNameValue("unattended="+DEVICE_UNATTENDED)
     print(">> EMV: len(EMV_TAGS)", str(len(EMV_TAGS)))
-    addEMVTagData()
+    addEMVTagData(False)
+    tclink.Submit()
+    return showTCLinkResponse()
+
+def processCreditTransaction():
+    global TRANSACTION_ID
+    tclink.PushNameValue("transid="+TRANSACTION_ID)
     tclink.Submit()
     return showTCLinkResponse()

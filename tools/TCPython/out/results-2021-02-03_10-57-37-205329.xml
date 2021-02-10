@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?><?xml-stylesheet type="text/xsl" href="testharness.xsl"?><testharness><message><timestamp>2021-02-03 10:58:14.208545</timestamp><level>error</level><value>Traceback (most recent call last):
+  File "C:\TCPython\TC_testharness\utility.py", line 96, in do_testharness
+    t()
+  File "TC_transtest_all_autoselect_EMV.py", line 2401, in processTransaction
+    response = TC_TCLink.processEMVTransaction(True)
+  File "C:\TCPython\TC_TCLink.py", line 669, in processEMVTransaction
+    addEMVTagData(isBlindRefund)
+  File "C:\TCPython\TC_TCLink.py", line 565, in addEMVTagData
+    if ISBALANCEINQUIRY == False and isBlindRefund == False:
+NameError: name 'ISBLINDREFUND' is not defined
+ </value></message></testharness>
