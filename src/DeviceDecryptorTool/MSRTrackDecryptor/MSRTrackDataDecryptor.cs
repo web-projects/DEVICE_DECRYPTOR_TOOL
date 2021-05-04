@@ -624,6 +624,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
 
             foreach (var tag in tags)
             {
+                Debug.WriteLine($"SRED TAG: {ConversionHelper.ByteArrayCodedHextoString(tag.Tag)}");
                 if (tag.Tag.SequenceEqual(sREDMagStripTrack1))
                 {
                     decryptedTrack1Data = ConversionHelper.ByteArrayCodedHextoString(tag.Data);

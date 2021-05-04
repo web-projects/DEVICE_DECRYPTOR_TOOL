@@ -1,0 +1,10 @@
+# Library is hardcoded to pgw1.trustcommerce.com
+# to point to a different Vault, change hosts file to hard code the end point
+
+#hosts
+#
+10.11.2.213 pgw1.trustcommerce.com
+
+# UL TESTING
+10.11.2.135	ulvlt.trustcommerce.com
+10.11.2.135	vault.trustcommerce.com
