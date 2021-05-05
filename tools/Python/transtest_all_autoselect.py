@@ -445,7 +445,8 @@ def OnlinePinTransaction(tlv, tid, cardState, continue_tpl):
         #,[(0x5A), PANDATA]                     # PAN DATA
         # 20201119: JIRA TICKET VS-52542 as this option does not work
         # AXP QC 037 - ALLOW PIN BYPASS WITH <GREEN> BUTTON
-        ,[(0xDF, 0xEC, 0x7D), b'\x01']          # PIN entry type: pressing ENTER on PIN Entry screen (without any PIN digits) will return SW1SW2=9000 response with no data
+        ,[(0xDF, 0xEC, 0x7D), b'\x01'],         # PIN entry type: pressing ENTER on PIN Entry screen (without any PIN digits) will return SW1SW2=9000 response with no data
+        [(0xDF, 0xED, 0x08), b'\x00']           # PIN Block Format ISO
     ]
     onlinepin_tpl = (0xE0, onlinepin_tag)
 
@@ -986,11 +987,13 @@ def processEMV(tid):
                         return OnlinePinInTemplateE6(tlv, EMV_CARD_INSERTED, continue_tpl)
                     # request PIN from user
                     return OnlinePinTransaction(tlv, tid, EMV_CARD_INSERTED, continue_tpl)
-                            
+                
+                # check for OFFLINE PIN ENTRY: KSN/ENCRYPTED DATA PAIR not to be extracted since PIN is OFFLINE verified
+                if "ENCRYPTED" in cvm_value or "PLAIN PIN" in cvm_value:
+                    hasPINEntry = False
+                    
             if tlv.tagCount(0xE5):
                 log.log("Transaction declined offline")
-                if hasPINEntry == True:
-                  OnlinePinInTemplateE6(tlv, EMV_CARD_INSERTED, continue_tpl)
                 return 2
                 
             break
@@ -1007,10 +1010,23 @@ def processEMV(tid):
         return 1
         
     if tlv.tagCount(0xE5):
-        log.log("Transaction declined offline")
+        log.logerr('TRANSACTION DECLINED OFFLINE')
+
+        # Check for Contact EMV Capture
+        # print(">>> EMV Data 3 ff7f", tlv.tagCount((0xFF,0x7F)))
+
         if hasPINEntry == True:
-          OnlinePinInTemplateE6(tlv, EMV_CARD_INSERTED, continue_tpl)
-        return 2
+            # expect Template E6 already collected PIN: retrieve PIN KSN/ENCRYPTED DATA
+            if len(OnlineEncryptedPIN) == 0 or len(OnlinePinKSN) == 0:
+                # save EMV Tags
+                #TC_TCLink.saveEMVData(tlv, 0xE5)
+                OnlinePinInTemplateE6()
+            # save continue tpl in case of PIN retry
+            OnlinePinContinueTPL = continue_tpl
+
+        #TC_TCLink.saveCardData(tlv)
+
+        return 6 if hasPINEntry else 2
         
     return 3
 
