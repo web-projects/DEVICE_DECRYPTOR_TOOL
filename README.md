@@ -31,3 +31,4 @@ This an application for decrypting MSR TRACK Data and ONLINE PIN.
 ### HISTORY ###
 
 * 20210209 - Initial repository.
+* 20220802 - Minor refactor.

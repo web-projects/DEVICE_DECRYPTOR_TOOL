@@ -1,4 +1,5 @@
 ﻿using DeviceDecryptorTool.Helpers;
+using DeviceDecryptorTool.HMAC;
 using DeviceDecryptorTool.MSRTrackDecryptor;
 using DeviceDecryptorTool.OnlinePinDecryptor;
 using Microsoft.Extensions.Configuration;
@@ -59,6 +60,26 @@ namespace DeviceDecryptorTool
 
             //InternalTesting();
             ConfigurationLoad(0);
+            //HMACTest();
+        }
+
+        static void HMACTest()
+        {
+            //string message = "FF1BC21071247B4E541EBC406AF03DE2547703F7B2D6719BE51DB8E496FCC74C";
+            string message = "F79B76E2CA36DB74CD3DFB614109B82D597959A10A6F728CBEACB55707BBE4A2";
+            string secret = "3CBB2F76F3F47B738953AFA541963B72164E40025CD07F2028F525B0005819E5";
+            //string outputHash = HMACData.CreateToken(message, secret);
+            string outputHash = HMACData.Tokenizer(message, secret);
+            Console.WriteLine($"HMAC={outputHash}");
+            //Console.Write("HMAC=");
+            //foreach (char letter in outputHash)
+            //{
+            //    // Get the integral value of the character.
+            //    int value = Convert.ToInt32(letter);
+            //    // Convert the integer value to a hexadecimal value in string form.
+            //    Console.Write($"{value:X}");
+            //}
+            //Console.WriteLine("");
         }
 
         static void ConfigurationLoad(int index)
@@ -70,7 +91,7 @@ namespace DeviceDecryptorTool
                 .Build();
 
             // ONLINE PIN GROUP
-            DecryptOnlinePin(configuration, index);
+            //DecryptOnlinePin(configuration, index);
 
             // MSR TRACK DATA GROUP
             MsrTrackDecryption(configuration, index);
@@ -193,9 +214,16 @@ namespace DeviceDecryptorTool
                     Console.WriteLine($"EXPIRATE : {trackInfo.ExpirationDate}");
                     Console.WriteLine($"SERV CODE: {trackInfo.ServiceCode}");
 
-                    byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
-                    bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
-                    Console.WriteLine($"EQUAL  : [{result}]");
+                    if (!string.IsNullOrEmpty(msrDecryptedTrackData))
+                    {
+                        byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
+                        bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
+                        Console.WriteLine($"EQUAL  : [{result}]");
+                    }
+                    else
+                    {
+                        Console.WriteLine("\nCOMPARISON NOT EXECUTED");
+                    }
 
                     //MSRTrackData trackData = decryptor.RetrieveTrackData(trackInformation);
                     //Console.WriteLine($"CHOLDER: [{trackData.Name}]");
