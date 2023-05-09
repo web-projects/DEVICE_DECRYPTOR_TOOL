@@ -187,12 +187,13 @@ namespace DeviceDecryptorTool
                     //Console.WriteLine($"DATA     : {msrEncryptedTrackData}");
 
                     // decryptor in action
+                    //byte[] trackInformation = decryptor.DecryptData(msrTrackKsn, msrEncryptedTrackData, msrTrackIV);
                     byte[] trackInformation = decryptor.DecryptData(msrTrackKsn, msrEncryptedTrackData);
 
                     string decryptedTrack = ConversionHelper.ByteArrayToHexString(trackInformation);
 
                     //1234567890|1234567890|12345
-                    //Console.WriteLine($"OUTPUT   : {decryptedTrack}");
+                    Console.WriteLine($"DECODED  : {decryptedTrack}");
                     Debug.WriteLine($"OUTPUT ____: {decryptedTrack}");
 
                     //MSRTrackData trackInfo = decryptor.RetrieveAdditionalData(trackInformation);
@@ -211,18 +212,17 @@ namespace DeviceDecryptorTool
                     Debug.WriteLine($"SERVICE CODE : {trackInfo.ServiceCode}");
                     Debug.WriteLine($"DISCRETIONARY: {trackInfo.DiscretionaryData}");
 
-                    Console.WriteLine($"EXPIRATE : {trackInfo.ExpirationDate}");
-                    Console.WriteLine($"SERV CODE: {trackInfo.ServiceCode}");
-
                     if (!string.IsNullOrEmpty(msrDecryptedTrackData))
                     {
-                        byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
+                        Console.WriteLine($"EXPIRATE : {trackInfo.ExpirationDate}");
+                        Console.WriteLine($"SERV CODE: {trackInfo.ServiceCode}"); byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
+                        
                         bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
                         Console.WriteLine($"EQUAL  : [{result}]");
                     }
                     else
                     {
-                        Console.WriteLine("\nCOMPARISON NOT EXECUTED");
+                        Console.WriteLine("\nNO TRACK2 DATA !!!");
                     }
 
                     //MSRTrackData trackData = decryptor.RetrieveTrackData(trackInformation);

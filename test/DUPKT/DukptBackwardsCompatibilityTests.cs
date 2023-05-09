@@ -1,7 +1,7 @@
-﻿using System;
-using System.Text;
-using DeviceDecryptorTool.DukptNet.Test.Extensions;
+﻿using DeviceDecryptorTool.DukptNet.Test.Extensions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Text;
 
 namespace DeviceDecryptorTool.DukptNet.Test
 {

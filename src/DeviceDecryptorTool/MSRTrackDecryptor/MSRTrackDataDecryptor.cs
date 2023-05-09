@@ -11,9 +11,77 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
     /// <summary>
     /// MSR Track Decryptor to allow extraction on the following:
     /// PAN, NAME, ADDITIONAL DATA (EXPIRATION DATE, SERVICE CODE), DISCRETIONARY DATA (PVKI, PVV, CVV, CVC)
+    ///
+    /// Verifone SRED Implementation
+    /// 
+    /// Verifone Secure Data is a Point-to-Point Encryption solution with capabilities for Encryption,
+    /// Decryption and Key management; that meets the Payment Card Industry PIN Transaction
+    /// requirements for card holder data encryption and Point-to-Point Encryption solution requirements.
+    /// 
+    /// VIPA 4.0.5.2 and above is enhanced to provide the Verifone Secure Data (VSD SRED) encryption
+    /// mechanism in order to develop Application on the Point-of-Sale (POS) for P2PE solution. This
+    /// feature is also supported in selected VIPA 5 and VIPA 6 releases.
+    /// VIPA sends the Account Data (In-the Clear) to the SRED Operating System(OS), where the Account
+    /// Data is encrypted using Derived Unique Key Per Transaction(DUKPT) and the encryption dat/a
+    /// provided by VIPA, in a Tamper Resistant Security Memory(TRSM).
+    /// 
+    /// The SRED OS encrypts this Account Data using mode of operation, Initialisation Vector and Padding
+    /// Scheme and returns to the VIPA three parts that can be used by a decryption service to decrypt and
+    /// therefore read the original data in-the-clear:
+    /// 
+    ///     • Encrypted data, which is 3DES encrypted
+    ///     • A Key Serial Number(KSN) – this is not to be confused with KSN used for PIN/MAC operations
+    ///     • Initialization Vector (IV)
+    ///
+    /// VIPA supports the following configurable parameters:
+    ///
+    ///     Encryption Mode of Operation: 
+    ///         • Cipher Block Chaining (CBC) (default) 
+    ///         • Electric Code Book (ECB)
+    ///         
+    ///     Initialisation Vector: 
+    ///         • None
+    ///         • Zero
+    ///         • Random (default)
+    ///         
+    /// Padding Scheme: 
+    /// 
+    ///     • None
+    ///         No padding added 
+    ///         
+    ///     • PKCS7
+    ///         Each padding byte equals the padding length.
+    ///         Example: XX XX XX XX 04 04 04 04
+    /// 
+    ///     • ISO7816 (default)
+    ///         First padding byte equals 0x80
+    ///         All other padding bytes equal 0x00
+    ///         Example: XX XX XX XX 80 00 00 00
+    /// 
+    /// The SRED-enabled OS supports up to 10 double length key 3DES algorithm DUKPT streams(Key Slot
+    /// Engines), that can be independently configured(0-9). Each stream is named after the Key Slot
+    /// Engine number(i.e. 0-9). If no valid Key Slot Engine is found then the default “0” engine will be
+    /// used. Key Slot Engine is used for ADE (Account Data Encryption).
+    /// 
+    /// Encrypted data consists of:
+    ///     • Application PAN
+    ///     • Sensitive Account Data(SAD) :
+    ///     • Full Magnetic Stripe Data( 5F21, 5F22, 5F23)
+    ///     • Track 1 and 2 Discretionary Data(9F1F, 9F20)
+    ///     • PayPass Track 1 and 2 Data(56, 9F6B)
+    ///     • Track 2 Equivalent Data(57)
+    ///     • Manual CVV2 / CID(DFDB02)
+    ///     • Manual PAN(DFDB02)
+    ///  Above data, in form of encryption block, will be passed to the POS together with IV, KSN and masked PAN.
+    /// 
     /// </summary>
     public class MSRTrackDataDecryptor : IMSRTrackDataDecryptor
     {
+        private readonly int keyDES3Size = 128; // 16 bytes * 8 = bits
+        private readonly int blkDES3Size = 64;  // 8 bytes * 8 = bits
+
+        const int sessionKeySize = 24;
+
         const int RegisterSize = 16;
         const int CardholderNameSize = 26;
         //const int DecryptedTrackDataMinimumLength = 48;
@@ -327,39 +395,56 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
                 //1234567890|1234567890|12345
                 Debug.WriteLine($"PEK REDUCED: {ConversionHelper.ByteArrayToHexString(ede3Key)}");
 
-                byte[] sessionKey = new byte[24];
+                byte[] sessionKey = new byte[sessionKeySize];
                 byte[] dataSessionKSN = SetDataKeyVariantKSN(ksn, 0);
 
                 using (var tdes = new TripleDESCryptoServiceProvider())
                 {
                     tdes.Mode = CipherMode.ECB;
                     tdes.Padding = PaddingMode.PKCS7;
+                    //tdes.Mode = CipherMode.CBC;
+                    //tdes.Padding = PaddingMode.None;
                     tdes.Key = ede3Key;
 
-                    // LEFT HALF
-                    using (var transform = tdes.CreateEncryptor())
+                    // LEFT HALF: subkey1
+                    using (var tdesEncrpytor = tdes.CreateEncryptor())
                     {
                         byte[] lHalf = new byte[8];
                         Array.Copy(maskedKey, lHalf, 8);
-                        byte[] ssbytes = transform.TransformFinalBlock(lHalf, 0, lHalf.Length);
-                        Array.Copy(ssbytes, sessionKey, 8);
-                    }
+                        byte[] subKey1 = tdesEncrpytor.TransformFinalBlock(lHalf, 0, lHalf.Length);
+                        Array.Copy(subKey1, sessionKey, 8);
 
-                    // RIGHT HALF
-                    using (var transform = tdes.CreateEncryptor())
-                    {
-                        byte[] rHalf = new byte[8];
-                        Array.Copy(maskedKey, 8, rHalf, 0, 8);
-                        byte[] ssbytes = transform.TransformFinalBlock(rHalf, 0, rHalf.Length);
-                        Array.Copy(ssbytes, 0, sessionKey, 8, 8);
+                        // RIGHT HALF: subkey2
+                        using (var transform = tdes.CreateEncryptor())
+                        {
+                            byte[] rHalf = new byte[8];
+                            Array.Copy(maskedKey, 8, rHalf, 0, 8);
+                            byte[] subKey2 = transform.TransformFinalBlock(rHalf, 0, rHalf.Length);
+                            Array.Copy(subKey2, 0, sessionKey, 8, 8);
 
-                        //1234567890|1234567890|12345
-                        Debug.WriteLine($"CURRENT KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
+                            //1234567890|1234567890|12345
+                            Debug.WriteLine($"CURRENT KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
 
-                        // Add extended bytes to session key
-                        Array.Copy(sessionKey, 0, sessionKey, 16, 8);
+                            // Add extended bytes to session key
+                            //Array.Copy(sessionKey, 0, sessionKey, 16, 8);
 
-                        return sessionKey;
+                            // ISO 7816 Padding
+                            byte[] sessionKeyPadding = new byte[] { 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+                            Array.Copy(sessionKeyPadding, 0, sessionKey, 16, 8);
+
+                            byte[] sessionKeyFinal = sessionKey;
+
+                            // NOPADDING: last 16-byte block is exclusive-OR'ed with subkey1
+                            // PADDING  : last 16-byte block is exclusive-OR'ed with subkey2
+                            for (int i = 0, j = 8; i < subKey2.Length; i++, j++)
+                            {
+                                //sessionKeyFinal[j] ^= subKey1[i];
+                                sessionKeyFinal[j] ^= subKey2[i];
+                            }
+
+                            //return sessionKeyFinal;
+                            return sessionKey;
+                        }
                     }
                 }
             }
@@ -395,7 +480,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
         /// <param name="ksn"></param>
         /// <param name="cipher"></param>
         /// <returns></returns>
-        public byte[] DecryptData(string initialKSN, string cipher)
+        public byte[] DecryptData(string initialKSN, string cipher, string iv = null)
         {
             byte[] finalBytes = null;
 
@@ -430,12 +515,16 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             Debug.WriteLine($"DECRYPT KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
             Console.WriteLine($"DECRYPTOR: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
 
+            Console.WriteLine($"DATA     : {cipher}");
+
             using (var tdes = new TripleDESCryptoServiceProvider())
             {
                 tdes.Mode = CipherMode.CBC;
+                tdes.KeySize = keyDES3Size;
+                tdes.BlockSize = blkDES3Size;
                 tdes.Padding = PaddingMode.None;
                 tdes.Key = sessionKey;
-                tdes.IV = new byte[8];
+                tdes.IV = iv is null ? new byte[8] : ConversionHelper.HexToByteArray(iv);
 
                 using (var transform = tdes.CreateDecryptor())
                 {
@@ -656,7 +745,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
 
                 // DISCRETIONARY DATA
                 if (match[0].Groups.Count > 5)
-                { 
+                {
                     trackData.DiscretionaryData = match[0].Groups[5].Value;
                 }
             }

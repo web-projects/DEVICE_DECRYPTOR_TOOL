@@ -1,5 +1,4 @@
-﻿using DeviceDecryptorTool.MSRTrackDecryptor;
-using DeviceDecryptorTool.Helpers;
+﻿using DeviceDecryptorTool.Helpers;
 using System.Collections.Generic;
 using TestHelper;
 using Xunit;
@@ -56,7 +55,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor.Tests
             Assert.NotNull(trackData.PANData);
             Assert.NotNull(trackData.Name);
             Assert.NotNull(trackData.ExpirationDate);
-            Assert.Equal(panData, trackData.PANData); 
+            Assert.Equal(panData, trackData.PANData);
             Assert.Equal(cardholderName, trackData.Name);
             Assert.Equal(discretionaryData, trackData.DiscretionaryData);
         }

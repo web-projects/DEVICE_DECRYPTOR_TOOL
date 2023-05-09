@@ -261,7 +261,6 @@ namespace DeviceDecryptorTool.DukptNet.Test
             byte[] decryptedBytes = Dukpt.Decrypt(_bdk, testKSN, testTrackData.HexStringToByteArray(), DUKPTVariant.Data);
             Debug.WriteLine(string.Format("DEC_: {0}", Helpers.ByteArrayToHexString(decryptedBytes)));
             Debug.WriteLine(string.Format("TK2_: {0}", Encoding.UTF8.GetString(decryptedBytes)));
-            //Assert.AreEqual(decryptedData, _clearData);
         }
         #endregion --- TARGET TESTS ---
     }
