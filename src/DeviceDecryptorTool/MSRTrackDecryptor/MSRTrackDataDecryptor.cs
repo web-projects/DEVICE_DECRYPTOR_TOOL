@@ -94,6 +94,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
         readonly byte[] BDKMASK;
 
         // Masking elements
+        readonly byte[] iso7816PadArray = new byte[] { 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         readonly byte[] KSNZERO = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xE0, 0x00, 0x00 };
         readonly byte[] RGMASK = new byte[] { 0xC0, 0xC0, 0xC0, 0xC0, 0x00, 0x00, 0x00, 0x00, 0xC0, 0xC0, 0xC0, 0xC0, 0x00, 0x00, 0x00, 0x00 };
         readonly byte[] DDMASK = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00 };
@@ -116,7 +117,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
         /// </summary>
         /// <param name="ksn"></param>
         /// <returns></returns>
-        byte[] SetKSNZeroCounter(byte[] ksn)
+        private byte[] SetKSNZeroCounter(byte[] ksn)
         {
             byte[] zeroksn = new byte[ksn.Length];
             int i = 0;
@@ -143,7 +144,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
         ///	
         /// </summary>
         /// <returns></returns>
-        byte[] SetRightRegisterMask()
+        private byte[] SetRightRegisterMask()
         {
             byte[] rrksn = new byte[BDKMASK.Length];
             int i = 0;
@@ -169,7 +170,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
         /// </summary>
         /// <param name="ksn"></param>
         /// <returns></returns>
-        List<int> GetTotalEncryptionPasses(byte[] ksn)
+        private List<int> GetTotalEncryptionPasses(byte[] ksn)
         {
             int passes = 0;
 
@@ -195,7 +196,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             return totalShifts;
         }
 
-        byte[] GenerateLeftRegister(byte[] ksnZeroCounter)
+        private byte[] GenerateLeftRegister(byte[] ksnZeroCounter)
         {
             using (var tdes = new TripleDESCryptoServiceProvider())
             {
@@ -214,7 +215,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             }
         }
 
-        byte[] GenerateRightRegister(byte[] ksnZeroCounter)
+        private byte[] GenerateRightRegister(byte[] ksnZeroCounter)
         {
             using (var tdes = new TripleDESCryptoServiceProvider())
             {
@@ -233,7 +234,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             }
         }
 
-        byte[] SetDataMask(byte[] key)
+        private byte[] SetDataMask(byte[] key)
         {
             byte[] rgkey = new byte[DDMASK.Length];
             int i = 0;
@@ -255,7 +256,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             return registerKey;
         }
 
-        byte[] SetRegisterMask(byte[] key)
+        private byte[] SetRegisterMask(byte[] key)
         {
             byte[] rgkey = new byte[RGMASK.Length];
             int i = 0;
@@ -361,7 +362,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             return dataSessionKSN;
         }
 
-        byte[] GenerateKey(byte[] key, byte[] ksn)
+        private byte[] GenerateKey(byte[] key, byte[] ksn)
         {
             // generate register mask
             byte[] maskedKey = SetRegisterMask(key);
@@ -382,7 +383,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             return registerKeys;
         }
 
-        byte[] CreateSessionKey(byte[] registerKeys, byte[] ksn)
+        private byte[] CreateSessionKey(byte[] registerKeys, byte[] ksn, bool iso7816Padding = false)
         {
             try
             {
@@ -402,8 +403,6 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
                 {
                     tdes.Mode = CipherMode.ECB;
                     tdes.Padding = PaddingMode.PKCS7;
-                    //tdes.Mode = CipherMode.CBC;
-                    //tdes.Padding = PaddingMode.None;
                     tdes.Key = ede3Key;
 
                     // LEFT HALF: subkey1
@@ -426,21 +425,19 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
                             Debug.WriteLine($"CURRENT KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
 
                             // Add extended bytes to session key
-                            //Array.Copy(sessionKey, 0, sessionKey, 16, 8);
-
-                            // ISO 7816 Padding
-                            byte[] sessionKeyPadding = new byte[] { 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-                            Array.Copy(sessionKeyPadding, 0, sessionKey, 16, 8);
-
-                            byte[] sessionKeyFinal = sessionKey;
-
-                            // NOPADDING: last 16-byte block is exclusive-OR'ed with subkey1
-                            // PADDING  : last 16-byte block is exclusive-OR'ed with subkey2
-                            for (int i = 0, j = 8; i < subKey2.Length; i++, j++)
+                            if (iso7816Padding)
                             {
-                                //sessionKeyFinal[j] ^= subKey1[i];
-                                sessionKeyFinal[j] ^= subKey2[i];
+                                Array.Copy(iso7816PadArray, 0, sessionKey, 16, 8);
                             }
+                            else
+                            {
+                                // copy subkey1 as padding
+                                Array.Copy(subKey1, 0, sessionKey, 16, 8);
+                                // copy subkey2 as padding: weak key
+                                //Array.Copy(subKey2, 0, sessionKey, 16, 8);
+                            }
+
+                            Debug.WriteLine($"_PADDED KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
 
                             //return sessionKeyFinal;
                             return sessionKey;
@@ -455,7 +452,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             }
         }
 
-        byte[] GenerateIPEK(byte[] baseKSN)
+        private byte[] GenerateIPEK(byte[] baseKSN)
         {
             byte[] registerKeys = new byte[RegisterSize];
 
@@ -473,17 +470,8 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             return registerKeys;
         }
 
-        /// <summary>
-        /// Decryption setup requires to iterate through the number of potential swipes that have already occurred with the KSN
-        /// being used to decrypt. Once we iterate through all possibilities, we end up with the final decrypting key used to decrypt the data.
-        /// </summary>
-        /// <param name="ksn"></param>
-        /// <param name="cipher"></param>
-        /// <returns></returns>
-        public byte[] DecryptData(string initialKSN, string cipher, string iv = null)
+        private byte[] GenerateSessionKey(string initialKSN, bool iso7816Padding = false)
         {
-            byte[] finalBytes = null;
-
             // Initial KSN
             byte[] ksn = ConversionHelper.HexToByteArray(initialKSN);
 
@@ -509,13 +497,27 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
                 iPEK = GenerateKey(iPEK, baseKSN);
             }
 
-            byte[] sessionKey = CreateSessionKey(iPEK, baseKSN);
+            return CreateSessionKey(iPEK, baseKSN, iso7816Padding);
+        }
+
+        /// <summary>
+        /// Decryption setup requires to iterate through the number of potential swipes that have already occurred with the KSN
+        /// being used to decrypt. Once we iterate through all possibilities, we end up with the final decrypting key used to decrypt the data.
+        /// </summary>
+        /// <param name="ksn"></param>
+        /// <param name="cipher"></param>
+        /// <returns></returns>
+        public byte[] DecryptData(string initialKSN, string cipher, string iv = null)
+        {
+            byte[] sessionKey = GenerateSessionKey(initialKSN, iv is { });
 
             //1234567890|1234567890|12345
             Debug.WriteLine($"DECRYPT KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
             Console.WriteLine($"DECRYPTOR: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
 
             Console.WriteLine($"DATA     : {cipher}");
+
+            byte[] finalBytes = null;
 
             using (var tdes = new TripleDESCryptoServiceProvider())
             {

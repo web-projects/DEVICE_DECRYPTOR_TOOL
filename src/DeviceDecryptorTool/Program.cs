@@ -196,8 +196,8 @@ namespace DeviceDecryptorTool
                     Console.WriteLine($"DECODED  : {decryptedTrack}");
                     Debug.WriteLine($"OUTPUT ____: {decryptedTrack}");
 
-                    //MSRTrackData trackInfo = decryptor.RetrieveAdditionalData(trackInformation);
-                    MSRTrackData trackInfo = decryptor.RetrieveTrackData(trackInformation);
+                    MSRTrackData trackInfo = decryptor.RetrieveAdditionalData(trackInformation);
+                    //MSRTrackData trackInfo = decryptor.RetrieveTrackData(trackInformation);
 
                     string expirationDate = "";
 

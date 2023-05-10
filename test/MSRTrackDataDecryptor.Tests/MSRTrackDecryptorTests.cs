@@ -1,5 +1,6 @@
 ﻿using DeviceDecryptorTool.Helpers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using TestHelper;
 using Xunit;
 using ConversionHelper = TestHelper.ConversionHelper;
@@ -19,6 +20,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor.Tests
         [InlineData("FFFF9876543211000620", 3)]
         [InlineData("FFFF9876543211000636", 6)]
         [InlineData("FFFF9876543211000637", 7)]
+        [InlineData("629949012C0000000003", 7)]
         public void GetTotalEncryptionPasses_ShouldReturnNumberOfPasses_WhenCalled(string ksn, int expectedValue)
         {
             byte[] initialKSN = ConversionHelper.HexToByteArray(ksn);
@@ -41,6 +43,31 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor.Tests
         }
 
         [Theory]
+        [InlineData("62994900000000000001", "B5610650EBC24CA3CACDD08DDAFE8CE3")]
+        [InlineData("629949012C0000000003", "D2943CCF80F42E88E23C12D1162FD547")]
+        public void GenerateIPEK_ShouldReturnValues_AsExpected(string ksn, string ipek)
+        {
+            byte[] initialKSN = ConversionHelper.HexToByteArray(ksn);
+
+            Helper.CallPrivateMethod("GenerateIPEK", subject, out byte[] ipekGenerated, new object[] { initialKSN });
+
+            byte[] expectedIpek = ConversionHelper.HexToByteArray(ipek);
+
+            Assert.Equal(expectedIpek, ipekGenerated);
+        }
+
+        [Theory]
+        [InlineData("629949012C0000000003", true, "F739AEF595D3877F731782D28BB6AC4F8000000000000000")]
+        [InlineData("629949012C0000000003", false, "F739AEF595D3877F731782D28BB6AC4FF739AEF595D3877F")]
+        public void GenerateSessionKey_ShouldReturnValues_AsExpected(string ksn, bool iso7816Padding, string paddedKey)
+        {
+            Helper.CallPrivateMethod("GenerateSessionKey", subject, out byte[] sessionKeyGenerated, new object[] { ksn, iso7816Padding });
+            byte[] expectedSessionKey = ConversionHelper.HexToByteArray(paddedKey);
+
+            Assert.Equal(expectedSessionKey, sessionKeyGenerated);
+        }
+
+        [Theory]
         [InlineData("DFDB06283B3337393630353137373131313131383D3235313231303130373130383036393930303030303F33DFDB053525423337393630353137373131313131385E49534F2F414D455854455354202020205E323531323130313037313038303639393F3F800000", "379605177111118", "ISO/AMEXTEST    ", "071080699")]
         //[InlineData("23B281E8E126E1EA3630353137373131313131383D3235313231303130373130383036393930303030303F33DFDB053525423337393630353137373131313131385E49534F2F414D455854455354202020205E323531323130313037313038303639393F3F800000", "", "ISO/AMEXTEST    ", "071080699")]
         //[InlineData("2542343831353838313030323836313839365E444F452F4C204A4F484E2020202020202020202020205E3232313231303233353638353820202020202030303939383030303030303F", "", "DOE/L JOHN            ", "")]
@@ -59,7 +86,6 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor.Tests
             Assert.Equal(cardholderName, trackData.Name);
             Assert.Equal(discretionaryData, trackData.DiscretionaryData);
         }
-
 
         [Theory]
         [InlineData("DFDB05472542353432343138303030303030353535305E524150494420434F4E4E45435420544553542F4D435E323531323130313130303031313131413132333435363738393031323F22DFDB06283B353432343138303030303030353535303D32353132313031313030303030313233343536373F3780", "5424180000005550", "RAPID CONNECT TEST/MC", "2512", "10001111A123456789012")]
