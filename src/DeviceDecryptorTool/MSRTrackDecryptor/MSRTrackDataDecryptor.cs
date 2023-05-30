@@ -430,13 +430,13 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
                             {
                                 Array.Copy(iso7816PadArray, 0, sessionKey, 16, 8);
                             }
-                            else
-                            {
-                                // copy subkey1 as padding
-                                //Array.Copy(subKey1, 0, sessionKey, 16, 8);
-                                // copy subkey2 as padding: weak key
-                                //Array.Copy(subKey2, 0, sessionKey, 16, 8);
-                            }
+                            //else
+                            //{
+                            //    // copy subkey1 as padding
+                            //    Array.Copy(subKey1, 0, sessionKey, 16, 8);
+                            //    // copy subkey2 as padding: weak key
+                            //    //Array.Copy(subKey2, 0, sessionKey, 16, 8);
+                            //}
 
                             Debug.WriteLine($"_PADDED KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
 
@@ -510,6 +510,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
         /// <returns></returns>
         public byte[] DecryptData(string initialKSN, string cipher, string iv = null)
         {
+            // not working as expected
             //byte[] sessionKey = GenerateSessionKey(initialKSN, iv is { });
             byte[] sessionKey = GenerateSessionKey(initialKSN);
 
@@ -539,62 +540,6 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
 
             return finalBytes;
         }
-
-        /*public MSRTrackData RetrieveTrackData(byte[] trackInformation)
-        {
-            MSRTrackData trackData = new MSRTrackData()
-            {
-                PANData = string.Empty,
-                Name = string.Empty,
-                ExpirationDate = string.Empty,
-                DiscretionaryData = string.Empty
-            };
-
-            // xF�E�t�24180001234563^FDCS TEST CARD /MASTERCARD^25121010001111123456789012?C�
-            //string decryptedTrack = ConversionHelper.ByteArrayToUTF8String(trackInformation);
-            //string decryptedTrack = ConversionHelper.ByteArrayToAsciiString(trackInformation);
-
-            // xF?E?t?24180001234563^FDCS TEST CARD /MASTERCARD^25121010001111123456789012?C?
-            string decryptedTrack = Regex.Replace(ConversionHelper.ByteArrayToAsciiString(trackInformation), @"[^\u0020-\u007E]", string.Empty);
-
-            // expected format: PAN^NAME^ADDITIONAL DATA^DISCRETIONARY DATA
-            //MatchCollection match = Regex.Matches(decryptedTrack, "(?:[^^^?]+)", RegexOptions.Compiled);
-            MatchCollection match = Regex.Matches(decryptedTrack, "([^^^]+)", RegexOptions.Compiled);
-
-            if (match.Count >= 3)
-            {
-                // PAN DATA
-                MatchCollection pan = Regex.Matches(match[0].Value, "(?:[^^^?]+)", RegexOptions.Compiled);
-
-                if (pan.Count >= 4)
-                { 
-                    trackData.PANData = Regex.Replace(pan[3].Value, @"[^\u0020-\u007E]", string.Empty);
-                }
-
-                // NAME
-                trackData.Name = match[1].Value;
-
-                // ADDITIONAL DATA
-                MatchCollection track1 = Regex.Matches(match[2].Value, "(?:[^^^?]+)", RegexOptions.Compiled);
-
-                if (track1.Count >= 1)
-                {
-                    trackData.ExpirationDate = track1[0].Value.Substring(0, 4);
-                    trackData.ServiceCode = track1[0].Value.Substring(4, 3);
-
-                    if (track1.Count >= 2)
-                    {
-                        MatchCollection discretionary = Regex.Matches(track1[1].Value, "^[[:ascii:]]+");
-                        if (discretionary.Count > 0)
-                        {
-                            trackData.DiscretionaryData = discretionary[0].Value;
-                        }
-                    }
-                }
-            }
-
-            return trackData;
-        }*/
 
         /// <summary>
         /// The Track 1 structure is specified as:
