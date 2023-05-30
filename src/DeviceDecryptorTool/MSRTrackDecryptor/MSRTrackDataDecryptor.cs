@@ -80,7 +80,8 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
         private readonly int keyDES3Size = 128; // 16 bytes * 8 = bits
         private readonly int blkDES3Size = 64;  // 8 bytes * 8 = bits
 
-        const int sessionKeySize = 24;
+        const int sessionKeySize = 16;
+        //const int sessionKeySize = 24;    // for ISO7816 PADDING
 
         const int RegisterSize = 16;
         const int CardholderNameSize = 26;
@@ -432,7 +433,7 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
                             else
                             {
                                 // copy subkey1 as padding
-                                Array.Copy(subKey1, 0, sessionKey, 16, 8);
+                                //Array.Copy(subKey1, 0, sessionKey, 16, 8);
                                 // copy subkey2 as padding: weak key
                                 //Array.Copy(subKey2, 0, sessionKey, 16, 8);
                             }
@@ -509,7 +510,8 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
         /// <returns></returns>
         public byte[] DecryptData(string initialKSN, string cipher, string iv = null)
         {
-            byte[] sessionKey = GenerateSessionKey(initialKSN, iv is { });
+            //byte[] sessionKey = GenerateSessionKey(initialKSN, iv is { });
+            byte[] sessionKey = GenerateSessionKey(initialKSN);
 
             //1234567890|1234567890|12345
             Debug.WriteLine($"DECRYPT KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
@@ -671,7 +673,10 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             if (trackInformation.Length >= DecryptedTrackDataMinimumLength)
             {
                 // clean up track data
-                string decryptedTrack = Regex.Replace(ConversionHelper.ByteArrayToAsciiString(trackInformation), @"[^\u0020-\u007E]", string.Empty, RegexOptions.Compiled);
+                //string decryptedTrackDataString = ConversionHelper.ByteArrayToAsciiString(trackInformation);
+                //string decryptedTrackDataString = ConversionHelper.ByteArrayCodedHextoString(trackInformation);
+                string decryptedTrackDataString = ConversionHelper.ByteArrayToUTF8String(trackInformation);
+                string decryptedTrack = Regex.Replace(decryptedTrackDataString, @"[^\u0020-\u007E]", string.Empty, RegexOptions.Compiled);
                 //Debug.WriteLine($"DECRYPTED _: {decryptedTrack}");
 
                 // expected format: PAN^NAME^ADDITIONAL-DATA^DISCRETIONARY-DATA
@@ -749,6 +754,65 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
                 if (match[0].Groups.Count > 5)
                 {
                     trackData.DiscretionaryData = match[0].Groups[5].Value;
+                }
+            }
+
+            return trackData;
+        }
+        
+        public MSRTrackData RetrieveFromTLV(byte[] trackInformation)
+        {
+            byte[] track2EquivalentTag = new byte[] { 0x57 };
+            byte[] applicationPANTag = new byte[] { 0x5A };
+
+            MSRTrackData trackData = new MSRTrackData()
+            {
+                PANData = string.Empty,
+                Name = string.Empty,
+                ExpirationDate = string.Empty,
+                DiscretionaryData = string.Empty
+            };
+
+            TLV.TLV tlv = new TLV.TLV();
+            List<TLV.TLV> tags = tlv.Decode(trackInformation, 0, trackInformation.Length, null);
+
+            string track2EquivalentData = "";
+            string applicationPANData = "";
+
+            foreach (var tag in tags)
+            {
+                Debug.WriteLine($"TRACK TAG __: {ConversionHelper.ByteArrayToHexString(tag.Tag)}");
+                Debug.WriteLine($"TRACK DATA _: {ConversionHelper.ByteArrayToHexString(tag.Data)}");
+                if (tag.Tag.SequenceEqual(track2EquivalentTag))
+                {
+                    track2EquivalentData = ConversionHelper.ByteArrayToHexString(tag.Data);
+                }
+                else if (tag.Tag.SequenceEqual(applicationPANTag))
+                {
+                    applicationPANData = ConversionHelper.ByteArrayToHexString(tag.Data);
+                }
+            }
+
+            // clean up track data
+            Debug.WriteLine($"DECRYPTED _: {track2EquivalentData}");
+
+            // expected format: PAN-D-YYMM-SERVICECODE-ADDITIONAL_DATA
+            MatchCollection match = Regex.Matches(track2EquivalentData, @"([0-9]{1,19})\D([0-9]{4})([0-9]{3})([0-9]{0,10})", RegexOptions.Compiled);
+
+            // DISCRETIONARY DATA is optional
+            if (match.Count == 1 && match[0].Groups.Count >= 5)
+            {
+                // PAN DATA
+                trackData.PANData = match[0].Groups[1].Value;
+
+                // ADDITIONAL DATA
+                trackData.ExpirationDate = match[0].Groups[2].Value;
+                trackData.ServiceCode = match[0].Groups[3].Value;
+
+                // DISCRETIONARY DATA
+                if (match[0].Groups.Count > 4)
+                {
+                    trackData.DiscretionaryData = match[0].Groups[4].Value;
                 }
             }
 

@@ -187,8 +187,8 @@ namespace DeviceDecryptorTool
                     //Console.WriteLine($"DATA     : {msrEncryptedTrackData}");
 
                     // decryptor in action
-                    //byte[] trackInformation = decryptor.DecryptData(msrTrackKsn, msrEncryptedTrackData, msrTrackIV);
-                    byte[] trackInformation = decryptor.DecryptData(msrTrackKsn, msrEncryptedTrackData);
+                    byte[] trackInformation = decryptor.DecryptData(msrTrackKsn, msrEncryptedTrackData, msrTrackIV);
+                    //byte[] trackInformation = decryptor.DecryptData(msrTrackKsn, msrEncryptedTrackData);
 
                     string decryptedTrack = ConversionHelper.ByteArrayToHexString(trackInformation);
 
@@ -196,8 +196,9 @@ namespace DeviceDecryptorTool
                     Console.WriteLine($"DECODED  : {decryptedTrack}");
                     Debug.WriteLine($"OUTPUT ____: {decryptedTrack}");
 
-                    MSRTrackData trackInfo = decryptor.RetrieveAdditionalData(trackInformation);
+                    //MSRTrackData trackInfo = decryptor.RetrieveAdditionalData(trackInformation);
                     //MSRTrackData trackInfo = decryptor.RetrieveTrackData(trackInformation);
+                    MSRTrackData trackInfo = decryptor.RetrieveFromTLV(trackInformation);
 
                     string expirationDate = "";
 
@@ -214,11 +215,12 @@ namespace DeviceDecryptorTool
 
                     if (!string.IsNullOrEmpty(msrDecryptedTrackData))
                     {
+                        Console.WriteLine($"PAN      : {trackInfo.PANData}");
                         Console.WriteLine($"EXPIRATE : {trackInfo.ExpirationDate}");
                         Console.WriteLine($"SERV CODE: {trackInfo.ServiceCode}"); byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
                         
                         bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
-                        Console.WriteLine($"EQUAL  : [{result}]");
+                        Console.WriteLine($"EQUAL    : [{result}]");
                     }
                     else
                     {
