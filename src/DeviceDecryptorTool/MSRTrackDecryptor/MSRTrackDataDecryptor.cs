@@ -721,6 +721,11 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor
             TLV.TLV tlv = new TLV.TLV();
             List<TLV.TLV> tags = tlv.Decode(trackInformation, 0, trackInformation.Length, null);
 
+            if (tags is null)
+            {
+                return null;
+            }
+
             string track2EquivalentData = "";
             string applicationPANData = "";
 

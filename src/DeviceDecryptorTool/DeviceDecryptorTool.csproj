@@ -22,7 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Config\" />
     <Folder Include="OnlinePinDecryptor\" />
     <Folder Include="TLV\" />
   </ItemGroup>

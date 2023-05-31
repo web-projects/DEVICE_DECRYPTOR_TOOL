@@ -1,4 +1,5 @@
-﻿using DeviceDecryptorTool.Helpers;
+﻿using DeviceDecryptorTool.Config;
+using DeviceDecryptorTool.Helpers;
 using DeviceDecryptorTool.HMAC;
 using DeviceDecryptorTool.MSRTrackDecryptor;
 using DeviceDecryptorTool.OnlinePinDecryptor;
@@ -9,6 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 
 namespace DeviceDecryptorTool
 {
@@ -34,6 +36,8 @@ namespace DeviceDecryptorTool
     /// </summary>
     class Program
     {
+        private static AppConfig configuration;
+
         // Actual Transactions
         public static List<MSRTrackPayload> trackPayload = new List<MSRTrackPayload>()
         {
@@ -61,6 +65,25 @@ namespace DeviceDecryptorTool
             //InternalTesting();
             ConfigurationLoad(0);
             //HMACTest();
+
+            // ONLINE PIN GROUP
+            //DecryptOnlinePin(configuration, index);
+
+            // MSR TRACK DATA GROUP
+            MsrTrackDecryption();
+
+#if !DEBUG
+            // Wait for KEY Press To Complete
+            Console.WriteLine("\r\n\r\nPress <ENTER> key to exit...");
+
+            ConsoleKeyInfo keypressed = Console.ReadKey(true);
+
+            while (keypressed.Key != ConsoleKey.Enter)
+            {
+                keypressed = Console.ReadKey(true);
+                Thread.Sleep(100);
+            }
+#endif
         }
 
         static void HMACTest()
@@ -85,16 +108,11 @@ namespace DeviceDecryptorTool
         static void ConfigurationLoad(int index)
         {
             // Get appsettings.json config.
-            IConfiguration configuration = new ConfigurationBuilder()
+            configuration = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .AddEnvironmentVariables()
-                .Build();
-
-            // ONLINE PIN GROUP
-            //DecryptOnlinePin(configuration, index);
-
-            // MSR TRACK DATA GROUP
-            MsrTrackDecryption(configuration, index);
+                .Build()
+                .Get<AppConfig>();
         }
 
         static void DecryptOnlinePin(IConfiguration configuration, int index)
@@ -138,7 +156,7 @@ namespace DeviceDecryptorTool
                     Console.WriteLine($"OUTPUT   : {decryptedPin}");
                     Debug.WriteLine($"OUTPUT ____: {decryptedPin}");
 
-                    OnlinePinData pinInfo = decryptor.RetrievePinData(pinInformation);
+                    Helpers.OnlinePinData pinInfo = decryptor.RetrievePinData(pinInformation);
 
                     //1234567890|1234567890|12345
                     Debug.WriteLine($"PAN DATA   : {pinInfo.PANData}");
@@ -154,26 +172,16 @@ namespace DeviceDecryptorTool
             }
         }
 
-        static void MsrTrackDecryption(IConfiguration configuration, int index)
+        static void MsrTrackDecryption()
         {
-            var trackData = configuration.GetSection("MSRTrackDataGroup:MSRTrackData")
-                     .GetChildren()
-                     .ToList()
-                     .Select(x => new
-                     {
-                         msrTrackKsn = x.GetValue<string>("KSN"),
-                         msrTrackIV = x.GetValue<string>("IV"),
-                         msrEncryptedTrackData = x.GetValue<string>("EncryptedTrackData"),
-                         msrDecryptedTrackData = x.GetValue<string>("DecryptedTrackData")
-                     });
-
             // Is there a matching item?
-            if (trackData.Count() > index)
+            int activeIndex = configuration.MSRTrackDataGroup.ActiveIndex;
+            if (configuration.MSRTrackDataGroup.MSRTrackDataList.Count() > activeIndex)
             {
-                string msrTrackKsn = trackData.ElementAt(index).msrTrackKsn;
-                string msrTrackIV = trackData.ElementAt(index).msrTrackIV;
-                string msrEncryptedTrackData = trackData.ElementAt(index).msrEncryptedTrackData;
-                string msrDecryptedTrackData = trackData.ElementAt(index).msrDecryptedTrackData;
+                string msrTrackKsn = configuration.MSRTrackDataGroup.MSRTrackDataList.ElementAt(activeIndex).KSN;
+                string msrTrackIV = configuration.MSRTrackDataGroup.MSRTrackDataList.ElementAt(activeIndex).IV;
+                string msrEncryptedTrackData = configuration.MSRTrackDataGroup.MSRTrackDataList.ElementAt(activeIndex).EncryptedTrackData;
+                string msrDecryptedTrackData = configuration.MSRTrackDataGroup.MSRTrackDataList.ElementAt(activeIndex).DecryptedTrackData;
 
                 try
                 {
@@ -202,23 +210,26 @@ namespace DeviceDecryptorTool
 
                     string expirationDate = "";
 
-                    if (trackInfo.ExpirationDate.Length >= 4)
+                    if (trackInfo?.ExpirationDate?.Length >= 4)
                     {
                         expirationDate = trackInfo.ExpirationDate.Substring(0, 2) + "/" + trackInfo.ExpirationDate.Substring(2, 2);
                     }
 
                     //1234567890|1234567890|12345
-                    Debug.WriteLine($"PAN DATA     : {trackInfo.PANData}");
-                    Debug.WriteLine($"EXPIR (YY/MM): {expirationDate}");
-                    Debug.WriteLine($"SERVICE CODE : {trackInfo.ServiceCode}");
-                    Debug.WriteLine($"DISCRETIONARY: {trackInfo.DiscretionaryData}");
-
-                    if (!string.IsNullOrEmpty(msrDecryptedTrackData))
+                    if (trackInfo is { })
                     {
-                        Console.WriteLine($"PAN      : {trackInfo.PANData}");
-                        Console.WriteLine($"EXPIRATE : {trackInfo.ExpirationDate}");
-                        Console.WriteLine($"SERV CODE: {trackInfo.ServiceCode}"); byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
-                        
+                        Debug.WriteLine($"PAN DATA     : {trackInfo?.PANData}");
+                        Debug.WriteLine($"EXPIR (YY/MM): {expirationDate}");
+                        Debug.WriteLine($"SERVICE CODE : {trackInfo?.ServiceCode}");
+                        Debug.WriteLine($"DISCRETIONARY: {trackInfo?.DiscretionaryData}");
+                    }
+
+                    if (!string.IsNullOrEmpty(msrDecryptedTrackData) && trackInfo is { })
+                    {
+                        Console.WriteLine($"PAN      : {trackInfo?.PANData}");
+                        Console.WriteLine($"EXPIRATE : {trackInfo?.ExpirationDate}");
+                        Console.WriteLine($"SERV CODE: {trackInfo?.ServiceCode}"); byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
+
                         bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
                         Console.WriteLine($"EQUAL    : [{result}]");
                     }
@@ -258,7 +269,7 @@ namespace DeviceDecryptorTool
                     bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
                     Console.WriteLine($"EQUAL  : [{result}]");
 
-                    MSRTrackData trackData = decryptor.RetrieveTrackData(trackInformation);
+                    Helpers.MSRTrackData trackData = decryptor.RetrieveTrackData(trackInformation);
                     Console.WriteLine($"CHOLDER: [{trackData.Name}]");
                 }
             }
