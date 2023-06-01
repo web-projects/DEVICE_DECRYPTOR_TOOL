@@ -39,7 +39,7 @@ namespace DeviceDecryptorTool
     /// </summary>
     class Program
     {
-        #region --- WINDOWSFORMS ---
+        #region --- CLIPBOARD COPY IMPLEMENTATION ---
         [DllImport("kernel32.dll")]
         private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
 
@@ -81,7 +81,7 @@ namespace DeviceDecryptorTool
         const uint CF_UNICODETEXT = 13;
         // ReSharper restore InconsistentNaming
 
-        #endregion --- WINDOWSFORMS ---
+        #endregion --- CLIPBOARD COPY IMPLEMENTATION ---
 
         private static AppConfig configuration;
 
@@ -311,6 +311,7 @@ namespace DeviceDecryptorTool
             }
         }
 
+        #region --- CLIPBOARD COPY IMPLEMENTATION ---
         [STAThread]
         public static Result PushStringToClipboard(string message)
         {
@@ -486,6 +487,7 @@ namespace DeviceDecryptorTool
         {
             return GlobalAlloc(GHND, (UIntPtr)bytes);
         }
+        #endregion --- CLIPBOARD COPY IMPLEMENTATION ---
 
         private static void InternalTesting()
         {
