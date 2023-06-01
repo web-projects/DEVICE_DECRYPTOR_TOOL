@@ -1,4 +1,5 @@
 ﻿using DeviceDecryptorTool.Config;
+using DeviceDecryptorTool.Extensions;
 using DeviceDecryptorTool.Helpers;
 using DeviceDecryptorTool.HMAC;
 using DeviceDecryptorTool.MSRTrackDecryptor;
@@ -62,28 +63,26 @@ namespace DeviceDecryptorTool
             Console.WriteLine($"{Assembly.GetEntryAssembly().GetName().Name} - Version {Assembly.GetEntryAssembly().GetName().Version}");
             Console.WriteLine($"==========================================================================================\r\n");
 
-            //InternalTesting();
-            ConfigurationLoad(0);
-            //HMACTest();
+            ConsoleKeyInfo keypressed = new ConsoleKeyInfo();
 
-            // ONLINE PIN GROUP
-            //DecryptOnlinePin(configuration, index);
-
-            // MSR TRACK DATA GROUP
-            MsrTrackDecryption();
-
-#if !DEBUG
-            // Wait for KEY Press To Complete
-            Console.WriteLine("\r\n\r\nPress <ENTER> key to exit...");
-
-            ConsoleKeyInfo keypressed = Console.ReadKey(true);
-
-            while (keypressed.Key != ConsoleKey.Enter)
+            while (keypressed.Key != ConsoleKey.Escape)
             {
+                //InternalTesting();
+                ConfigurationLoad(0);
+
+                //HMACTest();
+
+                // ONLINE PIN GROUP
+                //DecryptOnlinePin(configuration, index);
+
+                // MSR TRACK DATA GROUP
+                MsrTrackDecryption();
+
+                // Wait for KEY Press To Complete
+                Console.WriteLine("\r\n\r\nPress <ESC> key to exit...");
                 keypressed = Console.ReadKey(true);
                 Thread.Sleep(100);
             }
-#endif
         }
 
         static void HMACTest()
@@ -226,15 +225,28 @@ namespace DeviceDecryptorTool
 
                     if (!string.IsNullOrEmpty(msrDecryptedTrackData) && trackInfo is { })
                     {
-                        Console.WriteLine($"PAN      : {trackInfo?.PANData}");
-                        Console.WriteLine($"EXPIRATE : {trackInfo?.ExpirationDate}");
-                        Console.WriteLine($"SERV CODE: {trackInfo?.ServiceCode}"); byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
+                        Console.WriteLine();
+                        Console.WriteLine("==== [DECRYPTED TRACK DATA] ====");
+                        Console.WriteLine($"PAN          : {trackInfo?.PANData}");
+                        // * EXPIRY-YYMM  : 4
+                        Console.WriteLine($"EXPIRATE     : {trackInfo?.ExpirationDate}");
+                        // * SERVICE CODE : 3
+                        Console.WriteLine($"SERV CODE    : {trackInfo?.ServiceCode}"); byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
+                        // *PVKI          : 1
+                        // *PVV or Offset : 4
+                        // * CVV or* CVC  : 3
+                        Console.WriteLine($"DISCRETIONARY: {trackInfo?.DiscretionaryData}");
+                        string track2DataPayload = $"{trackInfo?.PANData}={trackInfo?.ExpirationDate}{trackInfo?.ServiceCode}{trackInfo?.DiscretionaryData}";
+                        // '*' mask 6-12, 17-24
+                        string track2DataMasked = StringExtensions.Masked(StringExtensions.Masked(track2DataPayload, 6, 6), 17, 7);
+                        Console.WriteLine($"TRACK2 DATA  : {track2DataMasked}");
 
-                        bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
-                        Console.WriteLine($"EQUAL    : [{result}]");
+                        //bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
+                        //Console.WriteLine($"EQUAL        : [{result}]");
                     }
                     else
                     {
+                        Debug.WriteLine("\nNO TRACK2 DATA !!!");
                         Console.WriteLine("\nNO TRACK2 DATA !!!");
                     }
 
@@ -243,6 +255,7 @@ namespace DeviceDecryptorTool
                 }
                 catch (Exception e)
                 {
+                    Debug.WriteLine($"EXCEPTION: {e.Message}");
                     Console.WriteLine($"EXCEPTION: {e.Message}");
                 }
             }
