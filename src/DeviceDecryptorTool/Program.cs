@@ -1,18 +1,14 @@
-﻿using DeviceDecryptorTool.Config;
-using DeviceDecryptorTool.Extensions;
-using DeviceDecryptorTool.Helpers;
-using DeviceDecryptorTool.HMAC;
-using DeviceDecryptorTool.MSRTrackDecryptor;
-using DeviceDecryptorTool.OnlinePinDecryptor;
+﻿using Common.LoggerManager;
+using Decryptors.HELPER.HMAC;
+using Decryptors.HELPER.MSRTrackDecryptor;
+using Decryptors.MSR;
+using DeviceDecryptorTool.Config;
 using Microsoft.Extensions.Configuration;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 
 namespace DeviceDecryptorTool
@@ -39,51 +35,8 @@ namespace DeviceDecryptorTool
     /// </summary>
     class Program
     {
-        #region --- CLIPBOARD COPY IMPLEMENTATION ---
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
-
-        [DllImport("kernel32.dll")]
-        private static extern uint GetLastError();
-
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr LocalFree(IntPtr hMem);
-
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GlobalFree(IntPtr hMem);
-
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GlobalLock(IntPtr hMem);
-
-        [DllImport("kernel32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GlobalUnlock(IntPtr hMem);
-
-        // In .NET Framework there was a special case for a few function names and CopyMemory happened to be one of them.
-        // The special case was removed in .NET Core: "CopyMemory" becomes "RtlMoveMemory"
-        //[DllImport("kernel32.dll", EntryPoint = "CopyMemory", SetLastError = false)]
-        [DllImport("kernel32.dll", EntryPoint = "RtlMoveMemory", SetLastError = false)]
-        public static extern void CopyMemory(IntPtr dest, IntPtr src, uint count);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool OpenClipboard(IntPtr hWndNewOwner);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseClipboard();
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr SetClipboardData(uint uFormat, IntPtr data);
-
-        // ReSharper disable InconsistentNaming
-        const uint CF_TEXT = 1;
-        const uint CF_UNICODETEXT = 13;
-        // ReSharper restore InconsistentNaming
-
-        #endregion --- CLIPBOARD COPY IMPLEMENTATION ---
-
         private static AppConfig configuration;
+        private static TVPAttributes tvpAttributes = new TVPAttributes();
 
         // Actual Transactions
         public static List<MSRTrackPayload> trackPayload = new List<MSRTrackPayload>()
@@ -106,9 +59,21 @@ namespace DeviceDecryptorTool
         [STAThread]
         static void Main(string[] args)
         {
-            Console.WriteLine($"\r\n==========================================================================================");
-            Console.WriteLine($"{Assembly.GetEntryAssembly().GetName().Name} - Version {Assembly.GetEntryAssembly().GetName().Version}");
-            Console.WriteLine($"==========================================================================================\r\n");
+            SetupEnvironment();
+
+            // Check for arguments
+            if (args.Length >= 1)
+            {
+                ParseArguments(args);
+
+                if (tvpAttributes.HasValidProperties())
+                {
+                    // MSR TRACK DATA GROUP
+                    MsrTrackDecryptionWithParameters();
+
+                    return;
+                }
+            }
 
             ConsoleKeyInfo keypressed = new ConsoleKeyInfo();
 
@@ -119,11 +84,16 @@ namespace DeviceDecryptorTool
 
                 //HMACTest();
 
-                // ONLINE PIN GROUP
-                //DecryptOnlinePin(configuration, index);
-
-                // MSR TRACK DATA GROUP
-                MsrTrackDecryption();
+                if (configuration.Application.ExecutionMode == ExecutionMode.Execution.TrackData)
+                {
+                    // MSR TRACK DATA GROUP
+                    MsrTrackDecryption();
+                }
+                else
+                {
+                    // ONLINE PIN GROUP
+                    DecryptOnlinePin();
+                }
 
                 // Wait for KEY Press To Complete
                 Console.WriteLine("\r\n\r\nPress <ESC> key to exit...");
@@ -132,7 +102,146 @@ namespace DeviceDecryptorTool
             }
         }
 
-        static void HMACTest()
+        #region --- APPLICATION ENVIRONMENT ---
+        private static void SetupEnvironment()
+        {
+            ConfigurationLoad(0);
+
+            // logger manager
+            SetLogging();
+
+            // Screen Colors
+            SetScreenColors();
+
+            Console.WriteLine($"\r\n==========================================================================================");
+            Console.WriteLine($"{Assembly.GetEntryAssembly().GetName().Name} - Version {Assembly.GetEntryAssembly().GetName().Version}");
+            Console.WriteLine($"==========================================================================================\r\n");
+        }
+
+        private static void ConfigurationLoad(int index)
+        {
+            // Get appsettings.json config.
+            configuration = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
+                .Build()
+                .Get<AppConfig>();
+        }
+
+        private static void ParseArguments(string[] args)
+        {
+            tvpAttributes = new TVPAttributes();
+
+            // TVP|ksn:' + ksn + '|iv:' + iv + '|vipa:' + vipa
+            string[] commandString = args[0].Split('|');
+
+            if (commandString is { } && commandString.Length == 4)
+            {
+                foreach (string value in commandString)
+                {
+                    string[] tvpValue = value.Split(':');
+                    if (tvpValue is { } && tvpValue.Length == 2)
+                    {
+                        switch (tvpValue[0])
+                        {
+                            case "ksn":
+                            {
+                                tvpAttributes.KSN = tvpValue[1];
+                                break;
+                            }
+                            case "iv":
+                            {
+                                tvpAttributes.IV = tvpValue[1];
+                                break;
+                            }
+                            case "vipa":
+                            {
+                                tvpAttributes.EncryptedData = tvpValue[1];
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void SetLogging()
+        {
+            try
+            {
+                //string[] logLevels = GetLoggingLevels(0);
+                string[] logLevels = configuration.LoggerManager.Logging.Levels.Split("|");
+
+                if (logLevels.Length > 0)
+                {
+                    string fullName = Assembly.GetEntryAssembly().Location;
+                    string logname = Path.GetFileNameWithoutExtension(fullName) + ".log";
+                    string path = Directory.GetCurrentDirectory();
+                    string filepath = path + "\\logs\\" + logname;
+
+                    int levels = 0;
+                    foreach (string item in logLevels)
+                    {
+                        foreach (LOGLEVELS level in LogLevels.LogLevelsDictonary.Where(x => x.Value.Equals(item)).Select(x => x.Key))
+                        {
+                            levels += (int)level;
+                        }
+                    }
+
+                    Logger.SetFileLoggerConfiguration(filepath, levels);
+
+                    Logger.info($"{Assembly.GetEntryAssembly().GetName().Name} ({Assembly.GetEntryAssembly().GetName().Version}) - LOGGING INITIALIZED.");
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.error("main: SetupLogging() - exception={0}", e.Message);
+            }
+        }
+
+        private static void SetScreenColors()
+        {
+            try
+            {
+                // Set Foreground color
+                //Console.ForegroundColor = GetColor(configuration.GetSection("Application:Colors").GetValue<string>("ForeGround"));
+                Console.ForegroundColor = GetColor(configuration.Application.Colors.ForeGround);
+
+                // Set Background color
+                //Console.BackgroundColor = GetColor(configuration.GetSection("Application:Colors").GetValue<string>("BackGround"));
+                Console.BackgroundColor = GetColor(configuration.Application.Colors.BackGround);
+
+                Console.Clear();
+            }
+            catch (Exception ex)
+            {
+                Logger.error("main: SetScreenColors() - exception={0}", ex.Message);
+            }
+        }
+
+        private static ConsoleColor GetColor(string color) => color switch
+        {
+            "BLACK" => ConsoleColor.Black,
+            "DARKBLUE" => ConsoleColor.DarkBlue,
+            "DARKGREEEN" => ConsoleColor.DarkGreen,
+            "DARKCYAN" => ConsoleColor.DarkCyan,
+            "DARKRED" => ConsoleColor.DarkRed,
+            "DARKMAGENTA" => ConsoleColor.DarkMagenta,
+            "DARKYELLOW" => ConsoleColor.DarkYellow,
+            "GRAY" => ConsoleColor.Gray,
+            "DARKGRAY" => ConsoleColor.DarkGray,
+            "BLUE" => ConsoleColor.Blue,
+            "GREEN" => ConsoleColor.Green,
+            "CYAN" => ConsoleColor.Cyan,
+            "RED" => ConsoleColor.Red,
+            "MAGENTA" => ConsoleColor.Magenta,
+            "YELLOW" => ConsoleColor.Yellow,
+            "WHITE" => ConsoleColor.White,
+            _ => throw new Exception($"Invalid color identifier '{color}'.")
+        };
+        #endregion --- APPLICATION ENVIRONMENT ---
+
+        private static void HMACTest()
         {
             //string message = "FF1BC21071247B4E541EBC406AF03DE2547703F7B2D6719BE51DB8E496FCC74C";
             string message = "F79B76E2CA36DB74CD3DFB614109B82D597959A10A6F728CBEACB55707BBE4A2";
@@ -151,70 +260,26 @@ namespace DeviceDecryptorTool
             //Console.WriteLine("");
         }
 
-        private static void ConfigurationLoad(int index)
+        private static void DecryptOnlinePin()
         {
-            // Get appsettings.json config.
-            configuration = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddEnvironmentVariables()
-                .Build()
-                .Get<AppConfig>();
-        }
-
-        private static void DecryptOnlinePin(IConfiguration configuration, int index)
-        {
-            var onlinePin = configuration.GetSection("OnlinePinGroup:OnlinePin")
-                    .GetChildren()
-                    .ToList()
-                    .Select(x => new
-                    {
-                        onlinePinKsn = x.GetValue<string>("KSN"),
-                        onlinePinPan = x.GetValue<string>("PAN"),
-                        onlineEncryptedPin = x.GetValue<string>("EncryptedPin"),
-                        onlineDecryptedPin = x.GetValue<string>("DecryptedPin")
-                    });
-
             // Is there a matching item?
-            if (onlinePin.Count() > index)
+            int activeIndex = configuration.OnlinePinGroup.ActiveIndex;
+            if (configuration.OnlinePinGroup.OnlinePinDataList.Count() > activeIndex)
             {
-                string onlinePinKsn = onlinePin.ElementAt(index).onlinePinKsn;
-                string onlinePinPan = onlinePin.ElementAt(index).onlinePinPan;
-                string onlineEncryptedPin = onlinePin.ElementAt(index).onlineEncryptedPin;
-                string onlineDecryptedPin = onlinePin.ElementAt(index).onlineDecryptedPin;
+                string onlinePinKsn = configuration.OnlinePinGroup.OnlinePinDataList.ElementAt(activeIndex).KSN;
+                string onlinePinPan = configuration.OnlinePinGroup.OnlinePinDataList.ElementAt(activeIndex).PAN;
+                string onlineEncryptedPin = configuration.OnlinePinGroup.OnlinePinDataList.ElementAt(activeIndex).EncryptedPin;
+                string onlineDecryptedPin = configuration.OnlinePinGroup.OnlinePinDataList.ElementAt(activeIndex).DecryptedPin;
 
-                try
+                OnlinePin pinDecryptor = new OnlinePin()
                 {
-                    //1234567890|1234567890|12345
-                    Console.WriteLine($"==== [ ONLINE PIN DECRYPTION ] ====");
+                    OnlinePinKsn = onlinePinKsn,
+                    OnlinePinPan = onlinePinPan,
+                    OnlineEncryptedPin = onlineEncryptedPin,
+                    OnlineDecryptedPin = onlineDecryptedPin
+                };
 
-                    PinDecryptor decryptor = new PinDecryptor();
-
-                    Debug.WriteLine($"KSN      : {onlinePinKsn}");
-                    Console.WriteLine($"KSN      : {onlinePinKsn}");
-                    Console.WriteLine($"DATA     : {onlineEncryptedPin}");
-
-                    // decryptor in action
-                    byte[] pinInformation = decryptor.DecryptData(onlinePinKsn, onlineEncryptedPin);
-
-                    string decryptedPin = ConversionHelper.ByteArrayToHexString(pinInformation);
-
-                    //1234567890|1234567890|12345
-                    Console.WriteLine($"OUTPUT   : {decryptedPin}");
-                    Debug.WriteLine($"OUTPUT ____: {decryptedPin}");
-
-                    Helpers.OnlinePinData pinInfo = decryptor.RetrievePinData(pinInformation);
-
-                    //1234567890|1234567890|12345
-                    Debug.WriteLine($"PAN DATA   : {pinInfo.PANData}");
-
-                    byte[] expectedValue = ConversionHelper.HexToByteArray(onlineDecryptedPin);
-                    bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, pinInformation);
-                    Console.WriteLine($"EQUAL ___: [{result}]");
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"EXCEPTION: {e.Message}");
-                }
+                pinDecryptor.Decryptor();
             }
         }
 
@@ -229,294 +294,33 @@ namespace DeviceDecryptorTool
                 string msrEncryptedTrackData = configuration.MSRTrackDataGroup.MSRTrackDataList.ElementAt(activeIndex).EncryptedTrackData;
                 string msrDecryptedTrackData = configuration.MSRTrackDataGroup.MSRTrackDataList.ElementAt(activeIndex).DecryptedTrackData;
 
-                try
+                MSRTrack msrDecryptor = new MSRTrack()
                 {
-                    //1234567890|1234567890|12345
-                    Console.WriteLine($"\r\n==== [ MSR TRACK DECRYPTION ] ====");
+                    MsrTrackKsn = msrTrackKsn,
+                    MsrTrackIV = msrTrackIV,
+                    MsrEncryptedTrackData = msrEncryptedTrackData,
+                    MsrDecryptedTrackData = msrDecryptedTrackData
+                };
 
-                    MSRTrackDataDecryptor decryptor = new MSRTrackDataDecryptor();
+                msrDecryptor.Decryption();
+            }
+        }
 
-                    Debug.WriteLine($"KSN _______: {msrTrackKsn}");
-                    Console.WriteLine($"KSN      : {msrTrackKsn}");
-                    //Console.WriteLine($"DATA     : {msrEncryptedTrackData}");
-
-                    // decryptor in action
-                    byte[] trackInformation = decryptor.DecryptData(msrTrackKsn, msrEncryptedTrackData, msrTrackIV);
-                    //byte[] trackInformation = decryptor.DecryptData(msrTrackKsn, msrEncryptedTrackData);
-
-                    string decryptedTrack = ConversionHelper.ByteArrayToHexString(trackInformation);
-
-                    //1234567890|1234567890|12345
-                    Console.WriteLine($"DECODED  : {decryptedTrack}");
-                    Debug.WriteLine($"OUTPUT ____: {decryptedTrack}");
-
-                    //MSRTrackData trackInfo = decryptor.RetrieveAdditionalData(trackInformation);
-                    //MSRTrackData trackInfo = decryptor.RetrieveTrackData(trackInformation);
-                    MSRTrackData trackInfo = decryptor.RetrieveFromTLV(trackInformation);
-
-                    string expirationDate = "";
-
-                    if (trackInfo?.ExpirationDate?.Length >= 4)
-                    {
-                        expirationDate = trackInfo.ExpirationDate.Substring(0, 2) + "/" + trackInfo.ExpirationDate.Substring(2, 2);
-                    }
-
-                    //1234567890|1234567890|12345
-                    if (trackInfo is { })
-                    {
-                        Debug.WriteLine($"PAN DATA     : {trackInfo?.PANData}");
-                        Debug.WriteLine($"EXPIR (YY/MM): {expirationDate}");
-                        Debug.WriteLine($"SERVICE CODE : {trackInfo?.ServiceCode}");
-                        Debug.WriteLine($"DISCRETIONARY: {trackInfo?.DiscretionaryData}");
-                    }
-
-                    if (!string.IsNullOrEmpty(msrDecryptedTrackData) && trackInfo is { })
-                    {
-                        Console.WriteLine();
-                        Console.WriteLine("==== [DECRYPTED TRACK DATA] ====");
-                        Console.WriteLine($"PAN          : {trackInfo?.PANData}");
-                        // * EXPIRY-YYMM  : 4
-                        Console.WriteLine($"EXPIRATE     : {trackInfo?.ExpirationDate}");
-                        // * SERVICE CODE : 3
-                        Console.WriteLine($"SERV CODE    : {trackInfo?.ServiceCode}"); byte[] expectedValue = ConversionHelper.HexToByteArray(msrDecryptedTrackData);
-                        // *PVKI          : 1
-                        // *PVV or Offset : 4
-                        // * CVV or* CVC  : 3
-                        Console.WriteLine($"DISCRETIONARY: {trackInfo?.DiscretionaryData}");
-                        string track2DataPayload = $"{trackInfo?.PANData}={trackInfo?.ExpirationDate}{trackInfo?.ServiceCode}{trackInfo?.DiscretionaryData}";
-                        // '*' mask 6-12, 17-24
-                        string track2DataMasked = StringExtensions.Masked(StringExtensions.Masked(track2DataPayload, 6, 6), 17, 7);
-                        Console.WriteLine($"TRACK2 DATA  : {track2DataMasked}");
-
-                        //bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
-                        //Console.WriteLine($"EQUAL        : [{result}]");
-                    }
-                    else
-                    {
-                        Debug.WriteLine("\nNO TRACK2 DATA !!!");
-                        Console.WriteLine("\nNO TRACK2 DATA !!!");
-
-                        // copy resulting decrypted track data to clipboard and reprocess
-                        Result result = PushStringToClipboard(decryptedTrack);
-                    }
-
-                    //MSRTrackData trackData = decryptor.RetrieveTrackData(trackInformation);
-                    //Console.WriteLine($"CHOLDER: [{trackData.Name}]");
-                }
-                catch (Exception e)
+        private static void MsrTrackDecryptionWithParameters()
+        {
+            // Is there a matching item?
+            int activeIndex = configuration.MSRTrackDataGroup.ActiveIndex;
+            if (configuration.MSRTrackDataGroup.MSRTrackDataList.Count() > activeIndex)
+            {
+                MSRTrack msrDecryptor = new MSRTrack()
                 {
-                    Debug.WriteLine($"EXCEPTION: {e.Message}");
-                    Console.WriteLine($"EXCEPTION: {e.Message}");
-                }
-            }
-        }
+                    MsrTrackKsn = tvpAttributes.KSN,
+                    MsrTrackIV = tvpAttributes.IV,
+                    MsrEncryptedTrackData = tvpAttributes.EncryptedData,
+                    MsrDecryptedTrackData = ""
+                };
 
-        #region --- CLIPBOARD COPY IMPLEMENTATION ---
-        [STAThread]
-        public static Result PushStringToClipboard(string message)
-        {
-            var isAscii = (message != null && (message == Encoding.ASCII.GetString(Encoding.ASCII.GetBytes(message))));
-            if (isAscii)
-            {
-                return PushUnicodeStringToClipboard(message);
-            }
-            else
-            {
-                return PushAnsiStringToClipboard(message);
-            }
-        }
-
-        [STAThread]
-        public static Result PushUnicodeStringToClipboard(string message)
-        {
-            return __PushStringToClipboard(message, CF_UNICODETEXT);
-        }
-
-        [STAThread]
-        public static Result PushAnsiStringToClipboard(string message)
-        {
-            return __PushStringToClipboard(message, CF_TEXT);
-        }
-
-        [STAThread]
-        private static Result __PushStringToClipboard(string message, uint format)
-        {
-            OpenClipboard(IntPtr.Zero);
-            //IntPtr ptr = Marshal.StringToHGlobalUni(source);
-            //SetClipboardData(13, ptr);
-            //CloseClipboard();
-            //Marshal.FreeHGlobal(ptr);
-            try
-            {
-                try
-                {
-                    if (message is null)
-                    {
-                        return new Result { ResultCode = ResultCode.ErrorInvalidArgs };
-                    }
-
-                    if (!OpenClipboard(IntPtr.Zero))
-                    {
-                        return new Result { ResultCode = ResultCode.ErrorOpenClipboard, LastError = GetLastError() };
-                    }
-
-                    try
-                    {
-                        uint sizeOfChar;
-                        switch (format)
-                        {
-                            case CF_TEXT:
-                            sizeOfChar = 1;
-                            break;
-                            case CF_UNICODETEXT:
-                            sizeOfChar = 2;
-                            break;
-                            default:
-                            throw new Exception("Not Reachable");
-                        }
-
-                        var characters = (uint)message.Length;
-                        uint bytes = (characters + 1) * sizeOfChar;
-
-                        // ReSharper disable once InconsistentNaming
-                        const int GMEM_MOVABLE = 0x0002;
-                        // ReSharper disable once InconsistentNaming
-                        const int GMEM_ZEROINIT = 0x0040;
-                        // ReSharper disable once InconsistentNaming
-                        const int GHND = GMEM_MOVABLE | GMEM_ZEROINIT;
-
-                        // IMPORTANT: SetClipboardData requires memory that was acquired with GlobalAlloc using GMEM_MOVABLE.
-                        IntPtr hGlobal = NewMethod(bytes, GHND);
-                        if (hGlobal == IntPtr.Zero)
-                        {
-                            return new Result { ResultCode = ResultCode.ErrorGlobalAlloc, LastError = GetLastError() };
-                        }
-
-                        try
-                        {
-                            // IMPORTANT: Marshal.StringToHGlobalUni allocates using LocalAlloc with LMEM_FIXED.
-                            //            Note that LMEM_FIXED implies that LocalLock / LocalUnlock is not required.
-                            IntPtr source;
-                            switch (format)
-                            {
-                                case CF_TEXT:
-                                source = Marshal.StringToHGlobalAnsi(message);
-                                break;
-                                case CF_UNICODETEXT:
-                                source = Marshal.StringToHGlobalUni(message);
-                                break;
-                                default:
-                                throw new Exception("Not Reachable");
-                            }
-
-                            try
-                            {
-                                IntPtr target = NewMethod1(hGlobal);
-
-                                if (target == IntPtr.Zero)
-                                {
-                                    return new Result { ResultCode = ResultCode.ErrorGlobalLock, LastError = GetLastError() };
-                                }
-
-                                try
-                                {
-                                    CopyMemory(target, source, bytes);
-                                }
-                                finally
-                                {
-                                    var ignore = GlobalUnlock(target);
-                                }
-
-                                if (SetClipboardData(format, hGlobal).ToInt64() != 0)
-                                {
-                                    // IMPORTANT: SetClipboardData takes ownership of hGlobal upon success.
-                                    hGlobal = IntPtr.Zero;
-                                }
-                                else
-                                {
-                                    return new Result { ResultCode = ResultCode.ErrorSetClipboardData, LastError = GetLastError() };
-                                }
-                            }
-                            finally
-                            {
-                                // Marshal.StringToHGlobalUni actually allocates with LocalAlloc, thus we should theorhetically use LocalFree to free the memory...
-                                // ... but Marshal.FreeHGlobal actully uses a corresponding version of LocalFree internally, so this works, even though it doesn't
-                                //  behave exactly as expected.
-                                Marshal.FreeHGlobal(source);
-                            }
-                        }
-                        catch (OutOfMemoryException)
-                        {
-                            return new Result { ResultCode = ResultCode.ErrorOutOfMemoryException, LastError = GetLastError() };
-                        }
-                        catch (ArgumentOutOfRangeException)
-                        {
-                            return new Result { ResultCode = ResultCode.ErrorArgumentOutOfRangeException, LastError = GetLastError() };
-                        }
-                        finally
-                        {
-                            if (hGlobal != IntPtr.Zero)
-                            {
-                                var ignore = GlobalFree(hGlobal);
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        CloseClipboard();
-                    }
-                    return new Result { ResultCode = ResultCode.Success };
-                }
-                catch (Exception ex)
-                {
-                    return new Result { ResultCode = ResultCode.ErrorException, LastError = GetLastError() };
-                }
-            }
-            catch (Exception)
-            {
-                return new Result { ResultCode = ResultCode.ErrorGetLastError };
-            }
-        }
-
-        private static IntPtr NewMethod1(IntPtr hGlobal)
-        {
-            return GlobalLock(hGlobal);
-        }
-
-        private static IntPtr NewMethod(uint bytes, uint GHND)
-        {
-            return GlobalAlloc(GHND, (UIntPtr)bytes);
-        }
-        #endregion --- CLIPBOARD COPY IMPLEMENTATION ---
-
-        private static void InternalTesting()
-        {
-            try
-            {
-                foreach (var item in trackPayload)
-                {
-                    MSRTrackDataDecryptor decryptor = new MSRTrackDataDecryptor();
-
-                    // decryptor in action
-                    byte[] trackInformation = decryptor.DecryptData(item.KSN, item.EncryptedData);
-
-                    string decryptedTrack = ConversionHelper.ByteArrayToHexString(trackInformation);
-
-                    //1234567890|1234567890|12345
-                    Debug.WriteLine($"OUTPUT ____: {decryptedTrack}");
-                    Console.WriteLine($"OUTPUT : [{decryptedTrack}]");
-
-                    byte[] expectedValue = ConversionHelper.HexToByteArray(item.DecryptedData);
-                    bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
-                    Console.WriteLine($"EQUAL  : [{result}]");
-
-                    Helpers.MSRTrackData trackData = decryptor.RetrieveTrackData(trackInformation);
-                    Console.WriteLine($"CHOLDER: [{trackData.Name}]");
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"EXCEPTION: {e.Message}");
+                msrDecryptor.Decryption();
             }
         }
     }

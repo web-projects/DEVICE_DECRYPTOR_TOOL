@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DeviceDecryptorTool.DukptNet.Test.Extensions
+namespace Decryptors.DUPKT.Test.Extensions
 {
     public static class StringExtensions
     {

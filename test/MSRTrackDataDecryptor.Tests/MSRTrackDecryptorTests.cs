@@ -1,4 +1,4 @@
-﻿using DeviceDecryptorTool.Helpers;
+﻿using Decryptors.HELPER.MSRTrackDecryptor;
 using System.Collections.Generic;
 using System.Diagnostics;
 using TestHelper;
@@ -57,8 +57,8 @@ namespace DeviceDecryptorTool.MSRTrackDecryptor.Tests
         }
 
         [Theory]
-        [InlineData("629949012C0000000003", true, "F739AEF595D3877F731782D28BB6AC4F8000000000000000")]
-        [InlineData("629949012C0000000003", false, "F739AEF595D3877F731782D28BB6AC4FF739AEF595D3877F")]
+        [InlineData("629949012C0000000003", true, "F739AEF595D3877F731782D28BB6AC4F")]
+        [InlineData("629949012C0000000003", false, "F739AEF595D3877F731782D28BB6AC4F")]
         public void GenerateSessionKey_ShouldReturnValues_AsExpected(string ksn, bool iso7816Padding, string paddedKey)
         {
             Helper.CallPrivateMethod("GenerateSessionKey", subject, out byte[] sessionKeyGenerated, new object[] { ksn, iso7816Padding });

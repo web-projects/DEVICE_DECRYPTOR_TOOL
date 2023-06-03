@@ -1,11 +1,12 @@
-﻿using DeviceDecryptorTool.DukptNet.Test.Extensions;
+﻿using Decryptors.DUPKT.Test.Extensions;
+using Decryptors.HELPER;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DeviceDecryptorTool.DukptNet.Test
+namespace Decryptors.DUPKT.Test
 {
     [TestClass]
     public class DukptTests
@@ -259,7 +260,7 @@ namespace DeviceDecryptorTool.DukptNet.Test
             string testKSN = "FFFF987654321F800EF0";
             string testTrackData = "58AE53EDB7A148B7961C847546E39309B471AE75FB53F2D3C4C2BC2D8DD39841";
             byte[] decryptedBytes = Dukpt.Decrypt(_bdk, testKSN, testTrackData.HexStringToByteArray(), DUKPTVariant.Data);
-            Debug.WriteLine(string.Format("DEC_: {0}", Helpers.ByteArrayToHexString(decryptedBytes)));
+            Debug.WriteLine(string.Format("DEC_: {0}", ConversionHelper.ByteArrayToHexString(decryptedBytes)));
             Debug.WriteLine(string.Format("TK2_: {0}", Encoding.UTF8.GetString(decryptedBytes)));
         }
         #endregion --- TARGET TESTS ---

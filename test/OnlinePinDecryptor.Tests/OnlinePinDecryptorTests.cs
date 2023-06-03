@@ -1,4 +1,4 @@
-﻿using DeviceDecryptorTool.Helpers;
+﻿using Decryptors.HELPER.OnlinePinDecryptor;
 using System.Collections.Generic;
 using TestHelper;
 using Xunit;
