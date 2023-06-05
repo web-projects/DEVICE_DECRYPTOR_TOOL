@@ -201,21 +201,24 @@ namespace DeviceDecryptorTool
 
         private static void SetScreenColors()
         {
-            try
+            if (configuration.Application.EnableColors)
             {
-                // Set Foreground color
-                //Console.ForegroundColor = GetColor(configuration.GetSection("Application:Colors").GetValue<string>("ForeGround"));
-                Console.ForegroundColor = GetColor(configuration.Application.Colors.ForeGround);
+                try
+                {
+                    // Set Foreground color
+                    //Console.ForegroundColor = GetColor(configuration.GetSection("Application:Colors").GetValue<string>("ForeGround"));
+                    Console.ForegroundColor = GetColor(configuration.Application.Colors.ForeGround);
 
-                // Set Background color
-                //Console.BackgroundColor = GetColor(configuration.GetSection("Application:Colors").GetValue<string>("BackGround"));
-                Console.BackgroundColor = GetColor(configuration.Application.Colors.BackGround);
+                    // Set Background color
+                    //Console.BackgroundColor = GetColor(configuration.GetSection("Application:Colors").GetValue<string>("BackGround"));
+                    Console.BackgroundColor = GetColor(configuration.Application.Colors.BackGround);
 
-                Console.Clear();
-            }
-            catch (Exception ex)
-            {
-                Logger.error("main: SetScreenColors() - exception={0}", ex.Message);
+                    Console.Clear();
+                }
+                catch (Exception ex)
+                {
+                    Logger.error("main: SetScreenColors() - exception={0}", ex.Message);
+                }
             }
         }
 
@@ -302,7 +305,7 @@ namespace DeviceDecryptorTool
                     MsrDecryptedTrackData = msrDecryptedTrackData
                 };
 
-                msrDecryptor.Decryption();
+                msrDecryptor.Decryption(configuration.Application.MaskTrackData);
             }
         }
 
@@ -320,7 +323,7 @@ namespace DeviceDecryptorTool
                     MsrDecryptedTrackData = ""
                 };
 
-                msrDecryptor.Decryption();
+                msrDecryptor.Decryption(configuration.Application.MaskTrackData);
             }
         }
     }

@@ -8,8 +8,8 @@ namespace Common.Helpers
 
     public static class Utils
     {
-        public const int DeviceHealthKeyValueLength = 29;
-        public const char DeviceHealthKeyValuePaddingCharacter = '_';
+        public const int KeyValueLength = 13;
+        public const char KeyValuePaddingCharacter = '_';
         public const int DeviceLogKeyValueLength = 43;
         public const char DeviceLogKeyValuePaddingCharacter = '_';
 
@@ -62,7 +62,7 @@ namespace Common.Helpers
         }
 
 
-        public static string FormatStringAsRequired(string input, int length = DeviceHealthKeyValueLength, char filler = DeviceHealthKeyValuePaddingCharacter)
+        public static string FormatStringAsRequired(string input, int length = KeyValueLength, char filler = KeyValuePaddingCharacter)
         {
             return input.PadRight(length, filler);
         }

@@ -6,6 +6,8 @@ namespace DeviceDecryptorTool.Config
     public class Application
     {
         public Colors Colors { get; set; }
+        public bool EnableColors { get; set; }
+        public bool MaskTrackData { get; set; }
         public ExecutionMode.Execution ExecutionMode { get; set; } = Config.ExecutionMode.Execution.TrackData;
     }
 

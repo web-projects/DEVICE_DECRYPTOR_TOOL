@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -515,9 +516,9 @@ namespace Decryptors.HELPER.MSRTrackDecryptor
 
             //1234567890|1234567890|12345
             Debug.WriteLine($"DECRYPT KEY: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
-            Console.WriteLine($"DECRYPTOR: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
+            Console.WriteLine($"{Utils.FormatStringAsRequired("DECRYPTOR")}: {ConversionHelper.ByteArrayToHexString(sessionKey)}");
 
-            Console.WriteLine($"DATA     : {cipher}");
+            Console.WriteLine($"{Utils.FormatStringAsRequired("DATA")}: {cipher}");
 
             byte[] finalBytes = null;
 

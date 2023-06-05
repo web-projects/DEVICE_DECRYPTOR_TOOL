@@ -1,3 +1,4 @@
+using Common.Helpers;
 using Common.LoggerManager;
 using Decryptors.HELPER;
 using Decryptors.HELPER.Extensions;
@@ -22,7 +23,7 @@ namespace Decryptors.MSR
             Logger.info(loggerLog is { } ? loggerLog : consoleLog);
         }
 
-        public void Decryption()
+        public void Decryption(bool maskTrackData)
         {
             try
             {
@@ -31,7 +32,8 @@ namespace Decryptors.MSR
 
                 MSRTrackDataDecryptor decryptor = new MSRTrackDataDecryptor();
 
-                ConsoleLogger($"KSN _______: {MsrTrackKsn}");
+                ConsoleLogger($"{Utils.FormatStringAsRequired("KSN")}: {MsrTrackKsn}");
+
                 //Console.WriteLine($"DATA     : {msrEncryptedTrackData}");
 
                 // decryptor in action
@@ -41,7 +43,7 @@ namespace Decryptors.MSR
                 string decryptedTrack = ConversionHelper.ByteArrayToHexString(trackInformation);
 
                 //1234567890|1234567890|12345
-                ConsoleLogger($"DECODED  : {decryptedTrack}", $"OUTPUT ____: {decryptedTrack}");
+                ConsoleLogger($"{Utils.FormatStringAsRequired("DECODED")}: {decryptedTrack}", $"{Utils.FormatStringAsRequired("OUTPUT")}: {decryptedTrack}");
 
                 //MSRTrackData trackInfo = decryptor.RetrieveAdditionalData(trackInformation);
                 //MSRTrackData trackInfo = decryptor.RetrieveTrackData(trackInformation);
@@ -64,20 +66,25 @@ namespace Decryptors.MSR
 
                     Console.WriteLine();
                     ConsoleLogger("==== [DECRYPTED TRACK DATA] ====");
-                    ConsoleLogger($"PAN          : {trackInfo?.PANData}");
+                    ConsoleLogger($"{Utils.FormatStringAsRequired("PAN")}: {trackInfo?.PANData}");
                     // * EXPIRY-YYMM  : 4
-                    ConsoleLogger($"EXPIRATE     : {trackInfo?.ExpirationDate}");
+                    ConsoleLogger($"{Utils.FormatStringAsRequired("EXPIRATE")}: {trackInfo?.ExpirationDate}");
+                    ConsoleLogger($"{Utils.FormatStringAsRequired("KSN")}: {MsrTrackKsn}");
+
                     // * SERVICE CODE : 3
-                    ConsoleLogger($"SERV CODE    : {trackInfo?.ServiceCode}"); byte[] expectedValue = ConversionHelper.HexToByteArray(MsrDecryptedTrackData);
+                    ConsoleLogger($"{Utils.FormatStringAsRequired("SERV CODE")}: {trackInfo?.ServiceCode}");
+
                     // *PVKI          : 1
                     // *PVV or Offset : 4
                     // * CVV or* CVC  : 3
-                    ConsoleLogger($"DISCRETIONARY: {trackInfo?.DiscretionaryData}");
+                    ConsoleLogger($"{Utils.FormatStringAsRequired("DISCRETIONARY")}: {trackInfo?.DiscretionaryData}");
                     string track2DataPayload = $"{trackInfo?.PANData}={trackInfo?.ExpirationDate}{trackInfo?.ServiceCode}{trackInfo?.DiscretionaryData}";
-                    // '*' mask 6-12, 17-24
-                    string track2DataMasked = StringExtensions.Masked(StringExtensions.Masked(track2DataPayload, 6, 6), 17, 7);
-                    ConsoleLogger($"TRACK2 DATA  : {track2DataMasked}");
 
+                    // '*' mask 6-12, 17-24
+                    string track2DataMasked = maskTrackData ? StringExtensions.Masked(StringExtensions.Masked(track2DataPayload, 6, 6), 17, 7) : track2DataPayload;
+                    ConsoleLogger($"{Utils.FormatStringAsRequired("TRACK2 DATA")}: {track2DataMasked}");
+
+                    //byte[] expectedValue = ConversionHelper.HexToByteArray(MsrDecryptedTrackData);
                     //bool result = StructuralComparisons.StructuralEqualityComparer.Equals(expectedValue, trackInformation);
                     //Console.WriteLine($"EQUAL        : [{result}]");
 
