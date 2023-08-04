@@ -80,6 +80,9 @@ namespace Decryptors.MSR
                     ConsoleLogger($"{Utils.FormatStringAsRequired("DISCRETIONARY")}: {trackInfo?.DiscretionaryData}");
                     string track2DataPayload = $"{trackInfo?.PANData}={trackInfo?.ExpirationDate}{trackInfo?.ServiceCode}{trackInfo?.DiscretionaryData}";
 
+                    // set as environmental variable for other programs to consume (i.e. Python TestHarness)
+                    Environment.SetEnvironmentVariable("DECODED_TRACK_DATA", track2DataPayload);
+
                     // '*' mask 6-12, 17-24
                     string track2DataMasked = maskTrackData ? StringExtensions.Masked(StringExtensions.Masked(track2DataPayload, 6, 6), 17, 7) : track2DataPayload;
                     ConsoleLogger($"{Utils.FormatStringAsRequired("TRACK2 DATA")}: {track2DataMasked}");
