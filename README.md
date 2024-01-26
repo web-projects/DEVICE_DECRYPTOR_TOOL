@@ -32,3 +32,4 @@ This an application for decrypting MSR TRACK Data and ONLINE PIN.
 
 * 20210209 - Initial repository.
 * 20220802 - Minor refactor.
+* 20240126 - MiFare MSR reads.

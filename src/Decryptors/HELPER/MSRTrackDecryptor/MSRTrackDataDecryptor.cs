@@ -709,6 +709,8 @@ namespace Decryptors.HELPER.MSRTrackDecryptor
         {
             byte[] track2EquivalentTag = new byte[] { 0x57 };
             byte[] applicationPANTag = new byte[] { 0x5A };
+            byte[] track1SREDTag = new byte[] { 0xDF, 0xDB, 0x05 };
+            byte[] track2SREDTag = new byte[] { 0xDF, 0xDB, 0x06 };
 
             MSRTrackData trackData = new MSRTrackData()
             {
@@ -733,6 +735,7 @@ namespace Decryptors.HELPER.MSRTrackDecryptor
             {
                 Debug.WriteLine($"TRACK TAG __: {ConversionHelper.ByteArrayToHexString(tag.Tag)}");
                 Debug.WriteLine($"TRACK DATA _: {ConversionHelper.ByteArrayToHexString(tag.Data)}");
+
                 if (tag.Tag.SequenceEqual(track2EquivalentTag))
                 {
                     track2EquivalentData = ConversionHelper.ByteArrayToHexString(tag.Data);
@@ -740,6 +743,10 @@ namespace Decryptors.HELPER.MSRTrackDecryptor
                 else if (tag.Tag.SequenceEqual(applicationPANTag))
                 {
                     applicationPANData = ConversionHelper.ByteArrayToHexString(tag.Data);
+                }
+                else if (tag.Tag.SequenceEqual(track2SREDTag))
+                {
+                    track2EquivalentData = ConversionHelper.ByteArrayCodedHextoString(tag.Data);
                 }
             }
 

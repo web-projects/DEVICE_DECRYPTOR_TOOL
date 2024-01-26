@@ -1,4 +1,4 @@
-﻿namespace DeviceDecryptorTool.Config
+﻿namespace DeviceDecryptorTool.Config.LoggingConfig
 {
     public class LoggerManager
     {

@@ -3,6 +3,7 @@ using Decryptors.HELPER.HMAC;
 using Decryptors.HELPER.MSRTrackDecryptor;
 using Decryptors.MSR;
 using DeviceDecryptorTool.Config;
+using DeviceDecryptorTool.Config.ApplicationConfig;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
@@ -59,12 +60,12 @@ namespace DeviceDecryptorTool
         [STAThread]
         static void Main(string[] args)
         {
-            SetupEnvironment();
+            configuration = SetupEnvironment.SetEnvironment();
 
             // Check for arguments
             if (args.Length >= 1)
             {
-                ParseArguments(args);
+                tvpAttributes = SetupEnvironment.ParseArguments(args);
 
                 if (tvpAttributes.HasValidProperties())
                 {
@@ -80,7 +81,7 @@ namespace DeviceDecryptorTool
             while (keypressed.Key != ConsoleKey.Escape)
             {
                 //InternalTesting();
-                ConfigurationLoad(0);
+                //ConfigurationLoad(0);
 
                 //HMACTest();
 
@@ -101,148 +102,6 @@ namespace DeviceDecryptorTool
                 Thread.Sleep(100);
             }
         }
-
-        #region --- APPLICATION ENVIRONMENT ---
-        private static void SetupEnvironment()
-        {
-            ConfigurationLoad(0);
-
-            // logger manager
-            SetLogging();
-
-            // Screen Colors
-            SetScreenColors();
-
-            Console.WriteLine($"\r\n==========================================================================================");
-            Console.WriteLine($"{Assembly.GetEntryAssembly().GetName().Name} - Version {Assembly.GetEntryAssembly().GetName().Version}");
-            Console.WriteLine($"==========================================================================================\r\n");
-        }
-
-        private static void ConfigurationLoad(int index)
-        {
-            // Get appsettings.json config.
-            configuration = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddEnvironmentVariables()
-                .Build()
-                .Get<AppConfig>();
-        }
-
-        private static void ParseArguments(string[] args)
-        {
-            tvpAttributes = new TVPAttributes();
-
-            // TVP|ksn:' + ksn + '|iv:' + iv + '|vipa:' + vipa
-            string[] commandString = args[0].Split('|');
-
-            if (commandString is { } && commandString.Length == 4)
-            {
-                foreach (string value in commandString)
-                {
-                    string[] tvpValue = value.Split(':');
-                    if (tvpValue is { } && tvpValue.Length == 2)
-                    {
-                        switch (tvpValue[0])
-                        {
-                            case "ksn":
-                            {
-                                tvpAttributes.KSN = tvpValue[1];
-                                break;
-                            }
-                            case "iv":
-                            {
-                                tvpAttributes.IV = tvpValue[1];
-                                break;
-                            }
-                            case "vipa":
-                            {
-                                tvpAttributes.EncryptedData = tvpValue[1];
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        private static void SetLogging()
-        {
-            try
-            {
-                //string[] logLevels = GetLoggingLevels(0);
-                string[] logLevels = configuration.LoggerManager.Logging.Levels.Split("|");
-
-                if (logLevels.Length > 0)
-                {
-                    string fullName = Assembly.GetEntryAssembly().Location;
-                    string logname = Path.GetFileNameWithoutExtension(fullName) + ".log";
-                    string path = Directory.GetCurrentDirectory();
-                    string filepath = path + "\\logs\\" + logname;
-
-                    int levels = 0;
-                    foreach (string item in logLevels)
-                    {
-                        foreach (LOGLEVELS level in LogLevels.LogLevelsDictonary.Where(x => x.Value.Equals(item)).Select(x => x.Key))
-                        {
-                            levels += (int)level;
-                        }
-                    }
-
-                    Logger.SetFileLoggerConfiguration(filepath, levels);
-
-                    Logger.info($"{Assembly.GetEntryAssembly().GetName().Name} ({Assembly.GetEntryAssembly().GetName().Version}) - LOGGING INITIALIZED.");
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.error("main: SetupLogging() - exception={0}", e.Message);
-            }
-        }
-
-        private static void SetScreenColors()
-        {
-            if (configuration.Application.EnableColors)
-            {
-                try
-                {
-                    // Set Foreground color
-                    //Console.ForegroundColor = GetColor(configuration.GetSection("Application:Colors").GetValue<string>("ForeGround"));
-                    Console.ForegroundColor = GetColor(configuration.Application.Colors.ForeGround);
-
-                    // Set Background color
-                    //Console.BackgroundColor = GetColor(configuration.GetSection("Application:Colors").GetValue<string>("BackGround"));
-                    Console.BackgroundColor = GetColor(configuration.Application.Colors.BackGround);
-
-                    Console.Clear();
-                }
-                catch (Exception ex)
-                {
-                    Logger.error("main: SetScreenColors() - exception={0}", ex.Message);
-                }
-            }
-        }
-
-        private static ConsoleColor GetColor(string color) => color switch
-        {
-            "BLACK" => ConsoleColor.Black,
-            "DARKBLUE" => ConsoleColor.DarkBlue,
-            "DARKGREEEN" => ConsoleColor.DarkGreen,
-            "DARKCYAN" => ConsoleColor.DarkCyan,
-            "DARKRED" => ConsoleColor.DarkRed,
-            "DARKMAGENTA" => ConsoleColor.DarkMagenta,
-            "DARKYELLOW" => ConsoleColor.DarkYellow,
-            "GRAY" => ConsoleColor.Gray,
-            "DARKGRAY" => ConsoleColor.DarkGray,
-            "BLUE" => ConsoleColor.Blue,
-            "GREEN" => ConsoleColor.Green,
-            "CYAN" => ConsoleColor.Cyan,
-            "RED" => ConsoleColor.Red,
-            "MAGENTA" => ConsoleColor.Magenta,
-            "YELLOW" => ConsoleColor.Yellow,
-            "WHITE" => ConsoleColor.White,
-            _ => throw new Exception($"Invalid color identifier '{color}'.")
-        };
-        #endregion --- APPLICATION ENVIRONMENT ---
 
         private static void HMACTest()
         {

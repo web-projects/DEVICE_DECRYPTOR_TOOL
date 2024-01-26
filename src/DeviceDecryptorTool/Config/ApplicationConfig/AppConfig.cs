@@ -1,6 +1,7 @@
-﻿using System;
+﻿using DeviceDecryptorTool.Config.LoggingConfig;
+using System;
 
-namespace DeviceDecryptorTool.Config
+namespace DeviceDecryptorTool.Config.ApplicationConfig
 {
     [Serializable]
     public class AppConfig
