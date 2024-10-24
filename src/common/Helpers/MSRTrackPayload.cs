@@ -1,0 +1,9 @@
+﻿namespace Common.Helpers
+{
+    public class MSRTrackPayload
+    {
+        public string KSN { get; set; }
+        public string EncryptedData { get; set; }
+        public string DecryptedData { get; set; }
+    }
+}

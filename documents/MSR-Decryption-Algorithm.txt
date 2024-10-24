@@ -1,0 +1,63 @@
+=========================================================================================
+BDK = 0123456789ABCDEFFEDCBA9876543210
+KSN = FFFF9876543210E00008
+KEY = C39B2778B058AC376FB18DC906F75CBA
+=========================================================================================
+
+1. BDK for IPEK
+Append the first 8 bytes of the "BDK" to the end of the BDK to give us the following 24 byte key.
+
+BDK MSB-8: 0123456789ABCDEF
+0123456789ABCDEFFEDCBA9876543210+0123456789ABCDEF
+= 0123456789ABCDEFFEDCBA98765432100123456789ABCDEF
+
+2. SET KSN COUNTER TO 0
+Bitmask it with the hexadecimal represented by the string "FFFFFFFFFFFFFFE00000".
+
+FFFF9876543210E00008 & FFFFFFFFFFFFFFE00000
+= FFFF9876543210E00000
+
+REMOVE COUNTER: FFFF9876543210E0
+
+3. TripleDES encrypt FFFF9876543210E0 with the 24 byte 
+   "0123456789ABCDEFFEDCBA98765432100123456789ABCDEF" BDK. 
+
+The result of this encryption should give us the left register of our IPEK.
+LR=6AC292FAA1315B4D
+=========================================================================================
+4. To get the right register:
+BDK xor C0C0C0C000000000C0C0C0C000000000
+
+0123456789ABCDEFFEDCBA9876543210 xor C0C0C0C000000000C0C0C0C000000000
+= C1E385A789ABCDEF3E1C7A5876543210
+
+MSB-8: C1E385A789ABCDEF
+
+=========================================================================================
+5. Process right register by appending the most significant 8 bytes from #4 to the resulting 
+   24 byte key
+
+C1E385A789ABCDEF3E1C7A5876543210+C1E385A789ABCDEF
+=C1E385A789ABCDEF3E1C7A5876543210C1E385A789ABCDEF
+
+TripleDES encrypt FFFF9876543210E0 with the 24 byte 
+"C1E385A789ABCDEF3E1C7A5876543210C1E385A789ABCDEF" BDK. 
+
+The result of this encryption should give us the right register of our IPEK.
+RR=858AB3A3D7D5933A
+=========================================================================================
+
+Produces the following 16 byte IPEK (LEFT + RIGHT REGISTERS):
+6AC292FAA1315B4D 858AB3A3D7D5933A
+=6AC292FAA1315B4D858AB3A3D7D5933A
+
+C39B2778B058AC37 6FB18DC906F75CBA
+
+=========================================================================================
+6. SESSION KEY
+
+We are only concerned with the least significant 8 bytes of the KSN. We also want to zero
+out the counter portion of the KSN. This can be done by bitmasking the KSN using the mask below.
+
+FFFF9876543210E00008 & 0000FFFFFFFFFFE00000
+= 00009876543210E00000

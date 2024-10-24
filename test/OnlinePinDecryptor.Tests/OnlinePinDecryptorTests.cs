@@ -1,10 +1,9 @@
-﻿using DeviceDecryptorTool.Helpers;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TestHelper;
 using Xunit;
 using ConversionHelper = TestHelper.ConversionHelper;
 
-namespace DeviceDecryptorTool.OnlinePinDecryptor.Tests
+namespace Common.OnlinePinDecryptor.Tests
 {
     public class OnlinePinDecryptorTests
     {
