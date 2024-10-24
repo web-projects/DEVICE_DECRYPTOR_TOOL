@@ -10,6 +10,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace DeviceDecryptorTool
 {
@@ -53,7 +54,7 @@ namespace DeviceDecryptorTool
             }
         };
 
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             SetupEnvironment.SetEnvironment();
 
@@ -62,7 +63,14 @@ namespace DeviceDecryptorTool
             //InternalTesting();
             //ConfigurationLoad(0);
             //HMACTest();
-            MsrTrackDecryption(configuration.MSRTrackDataGroup.MSRTrackData.FirstOrDefault());
+
+            foreach(var msrTrackData in configuration.MSRTrackDataGroup.MSRTrackData)
+            {
+                MsrTrackDecryption(msrTrackData);
+            }
+
+            // wait for ESC key to exit
+            await SetupEnvironment.WaitForEscapeKeyPress();
 
             SetupEnvironment.SaveEnvironment();
         }

@@ -5,6 +5,7 @@ using System;
 using System.Reflection;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Config
 {
@@ -128,6 +129,26 @@ namespace Config
             {
                 Logger.error("main: SetupLogging() - exception={0}", e.Message);
             }
+        }
+
+        public static async Task WaitForEscapeKeyPress()
+        {
+            Console.WriteLine("\r\n\r\nPress <ESC> key to exit...");
+
+            while (true)
+            {
+                ConsoleKeyInfo keyPressed = Console.ReadKey(true);
+
+                if (keyPressed.Key == ConsoleKey.Escape)
+                {
+                    break;
+                }
+
+                await Task.Delay(100);
+            }
+
+            Console.WriteLine("APPLICATION EXITING ...");
+            Console.WriteLine("");
         }
 
         #endregion --- APPLICATION ENVIRONMENT ---
